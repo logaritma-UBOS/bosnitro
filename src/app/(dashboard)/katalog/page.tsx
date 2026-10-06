@@ -33,11 +33,11 @@ export default async function KatalogPage() {
 
   const isFnB = business.businessType === 'F_AND_B'
 
-  const [products, ingredients, suppliers] = await Promise.all([
+  const [products, ingredients] = await Promise.all([
     prisma.product.findMany({ where: { businessId: business.id, isActive: true } }),
-    prisma.ingredient.findMany({ where: { businessId: business.id } }),
-    prisma.supplier.findMany({ where: { businessId: business.id }, orderBy: { name: 'asc' } })
-  ])
+    prisma.ingredient.findMany({ where: { businessId: business.id } })
+  ]);
+  const suppliers: any[] = [];
 
   // Retail stock fetch
   const retailProducts = products.filter(p => !p.hasBOM && p.trackInventory)

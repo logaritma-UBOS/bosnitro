@@ -19,13 +19,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
     return null
   }
 
-  const isLocked = (label: string) => {
-    if (tier === "Starter") {
-      const lockedFeatures = ["Pelanggan", "Pengeluaran", "Stok & Supplier"]
-      return lockedFeatures.includes(label)
-    }
-    return false
-  }
+  const isLocked = (_label?: string) => false
 
   const isActive = (path: string) => {
     if (path === "/" || path === "/beranda") return pathname === "/" || pathname === "/beranda"
@@ -37,16 +31,8 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
 
       let menuCategories = [
     {
-      title: "JUALAN",
-      links: [
-        { label: "Toko Online", href: "/toko-online", icon: "🌐" },
-      ]
-    },
-    {
       title: "KELOLA",
       links: [
-        { label: "Stok & Supplier", href: "/stok", icon: "📦" },
-        { label: "Pelanggan", href: "/pelanggan", icon: "👥" },
         { label: "Pengeluaran", href: "/pengeluaran", icon: "💸" },
         { label: "Pegawai", href: "/pengaturan/pegawai", icon: "👥" },
       ]
@@ -64,7 +50,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
 
   // Filter for role
   if (role === "KASIR") {
-    const allowedKasir = ["/katalog", "/pelanggan"]; // Kasir only sees limited items in "Lainnya"
+    const allowedKasir = ["/katalog"]; // Kasir only sees limited items in "Lainnya"
     menuCategories = menuCategories.map(cat => ({
       ...cat,
       links: cat.links.filter(l => allowedKasir.includes(l.href))

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { calculateTierFromRevenues } from "@/lib/mayarSync";
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,8 +18,7 @@ export async function GET(req: NextRequest) {
                 status: "PAID"
               }
             });
-            const tierStatus = calculateTierFromRevenues(user.email, revenues);
-            isVip = userRole === "VIP" || userRole === "PREMIUM" || userRole === "SUPER_ADMIN" || tierStatus.isVIP;
+            isVip = true;
         }
     }
     

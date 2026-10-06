@@ -5,7 +5,6 @@ import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { checkoutSale } from "@/actions/pos"
-import { quickAddCustomer } from "@/actions/customer"
 import { getPendingTransactions, getPendingCount, setPendingTransactions, savePendingTransaction } from "@/lib/adapters/offlineQueueAdapter"
 import { Button } from "@/components/ui/Button"
 import { Badge } from "@/components/ui/Badge"
@@ -25,7 +24,7 @@ type CheckoutStep = "CART" | "PAYMENT" | "SUCCESS"
 
 type PaymentMethod = "CASH" | "QRIS" | "TRANSFER" | "DEBIT_CREDIT"
 
-export default function KasirClient({ products, customers }: { products: any[], customers: any[] }) {
+export default function KasirClient({ products }: { products: any[] }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [syncCount, setSyncCount] = useState(0)
@@ -38,23 +37,7 @@ export default function KasirClient({ products, customers }: { products: any[], 
   const [paidAmountText, setPaidAmountText] = useState<string>("")
   const [transactionSummary, setTransactionSummary] = useState<any>(null)
   
-  // Customer State
-  const [localCustomers, setLocalCustomers] = useState(customers)
-  const [searchCustomer, setSearchCustomer] = useState("")
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
-  
-  // Promo State
-  const [promoCodeInput, setPromoCodeInput] = useState("")
-  const [appliedPromo, setAppliedPromo] = useState<any>(null)
-  const [promoDiscount, setPromoDiscount] = useState(0)
-  const [isApplyingPromo, setIsApplyingPromo] = useState(false)
-  
-  // Quick Add Customer State
-  const [showAddCustomerForm, setShowAddCustomerForm] = useState(false)
-  const [newCustomerName, setNewCustomerName] = useState("")
-  const [newCustomerPhone, setNewCustomerPhone] = useState("")
-  const [isAddingCustomer, setIsAddingCustomer] = useState(false)
+  const selectedCustomerId = null;
   
   // Kasir POS Search State
   const [posSearch, setPosSearch] = useState('');
@@ -66,32 +49,7 @@ export default function KasirClient({ products, customers }: { products: any[], 
     );
   }, [products, posSearch]);
 
-  const filteredCustomers = localCustomers.filter((c: any) => 
-    c.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
-    (c.phone && c.phone.includes(searchCustomer))
-  )
-
-  const handleQuickAddCustomer = async () => {
-    if (!newCustomerName) return alert("Nama pelanggan harus diisi")
-    setIsAddingCustomer(true)
-    try {
-      const res = await quickAddCustomer(newCustomerName, newCustomerPhone)
-      if (res.error) {
-        alert(res.error)
-      } else if (res.customer) {
-        setLocalCustomers([...localCustomers, res.customer])
-        setSelectedCustomerId(res.customer.id)
-        setShowAddCustomerForm(false)
-        setNewCustomerName("")
-        setNewCustomerPhone("")
-        setSearchCustomer("")
-        setShowCustomerDropdown(false)
-      }
-    } catch (e) {
-      alert("Terjadi kesalahan sistem")
-    }
-    setIsAddingCustomer(false)
-  }
+  
 
   useEffect(() => {
     setSyncCount(getPendingCount())
@@ -114,21 +72,8 @@ export default function KasirClient({ products, customers }: { products: any[], 
   const updateSyncCount = () => setSyncCount(getPendingCount())
 
   const subtotal = cart.reduce((sum, item) => sum + (item.sellPrice * item.quantity), 0)
-  const total = Math.max(0, subtotal - promoDiscount)
+  const total = subtotal
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
-  
-  const handleApplyPromo = async () => {
-    if (!promoCodeInput) return;
-    alert("Fitur promo saat ini sedang tidak aktif.");
-    setAppliedPromo(null);
-    setPromoDiscount(0);
-  }
-
-  const handleRemovePromo = () => {
-    setAppliedPromo(null);
-    setPromoDiscount(0);
-    setPromoCodeInput("");
-  }
   
   // Update paid amount when total changes and payment method is not cash
   useEffect(() => {
@@ -230,13 +175,13 @@ export default function KasirClient({ products, customers }: { products: any[], 
       paymentMethod,
       paidAmount: paymentMethod === "CASH" ? paidAmount : total,
       change: paymentMethod === "CASH" ? paidAmount - total : 0,
-      customerPhone: selectedCustomerId ? localCustomers.find((c: any) => c.id === selectedCustomerId)?.phone : null
+      customerPhone: null
     }
 
     try {
       // Coba online
       const mappedCart = cart.map(c => ({ productId: c.id, quantity: c.quantity, price: c.sellPrice }))
-      const res = await checkoutSale(mappedCart, clientTransactionId, paymentMethod, paidAmount, selectedCustomerId || undefined, appliedPromo?.code)
+      const res = await checkoutSale(mappedCart, clientTransactionId, paymentMethod, paidAmount)
       if (res.error) {
         alert(res.error)
         setIsProcessing(false)
@@ -251,9 +196,7 @@ export default function KasirClient({ products, customers }: { products: any[], 
         paymentMethod,
         paidAmount,
         timestamp: new Date().toISOString(),
-        customerId: selectedCustomerId || undefined,
-        promoCode: appliedPromo?.code
-      })
+        })
     }
 
     updateSyncCount()
@@ -401,126 +344,7 @@ export default function KasirClient({ products, customers }: { products: any[], 
               <p className="text-4xl font-bold tracking-tight">{formatRupiah(total)}</p>
             </div>
 
-          {/* Customer Picker */}
-          <div className="mb-6 relative z-30">
-            <h3 className="font-bold text-gray-800 mb-3">Pelanggan (Opsional)</h3>
-            <div className="relative">
-              {selectedCustomerId ? (
-                <div className="flex items-center justify-between bg-primary-50 border border-primary-200 rounded-xl p-3">
-                  <div>
-                    <p className="font-bold text-primary-900">{localCustomers.find((c: any) => c.id === selectedCustomerId)?.name}</p>
-                    <p className="text-sm text-primary-700">{localCustomers.find((c: any) => c.id === selectedCustomerId)?.phone || "Tanpa Nomor HP"}</p>
-                  </div>
-                  <button onClick={() => setSelectedCustomerId(null)} className="text-danger-500 font-medium hover:bg-danger-50 p-2 rounded-lg">Batal</button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    value={searchCustomer}
-                    onChange={(e) => {
-                      setSearchCustomer(e.target.value)
-                      setShowCustomerDropdown(true)
-                    }}
-                    onFocus={() => setShowCustomerDropdown(true)}
-                    placeholder="Cari nama atau nomor WA..."
-                    className="w-full border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  {showCustomerDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-20">
-                      {filteredCustomers.length > 0 ? (
-                        filteredCustomers.map((c: any) => (
-                          <div 
-                            key={c.id} 
-                            onClick={() => {
-                              setSelectedCustomerId(c.id)
-                              setShowCustomerDropdown(false)
-                              setSearchCustomer("")
-                            }}
-                            className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                          >
-                            <p className="font-medium text-gray-900">{c.name}</p>
-                            {c.phone && <p className="text-xs text-gray-500">{c.phone}</p>}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-3 text-sm text-gray-500 text-center">Tidak ditemukan.</div>
-                      )}
-                      {/* Always show + Pelanggan Baru at the bottom if not showing form */}
-                      {!showAddCustomerForm && (
-                         <div className="p-3 bg-gray-50 border-t flex justify-between items-center text-sm">
-                           <span className="text-gray-500">Bukan di daftar?</span>
-                           <button onClick={() => setShowAddCustomerForm(true)} className="text-primary-600 font-medium">+ Pelanggan Baru</button>
-                         </div>
-                      )}
-                      {showAddCustomerForm && (
-                        <div className="p-4 bg-primary-50 border-t">
-                          <p className="text-sm font-bold text-primary-900 mb-2">Tambah Pelanggan Baru</p>
-                          <input 
-                            type="text" 
-                            placeholder="Nama Lengkap" 
-                            value={newCustomerName}
-                            onChange={e => setNewCustomerName(e.target.value)}
-                            className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-2 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Nomor WA (Opsional)" 
-                            value={newCustomerPhone}
-                            onChange={e => setNewCustomerPhone(e.target.value)}
-                            className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-3 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button onClick={() => setShowAddCustomerForm(false)} className="text-xs text-gray-500 px-3 py-1">Batal</button>
-                            <button 
-                              onClick={handleQuickAddCustomer}
-                              disabled={isAddingCustomer} 
-                              className="text-xs bg-primary-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
-                            >
-                              {isAddingCustomer ? "Menyimpan..." : "Simpan & Pilih"}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Promo Section */}
-            <div className="mb-6 relative z-10">
-              <h3 className="font-bold text-gray-800 mb-3">Promo & Diskon</h3>
-              {appliedPromo ? (
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-3">
-                  <div>
-                    <p className="font-bold text-green-900">Kode: {appliedPromo.code}</p>
-                    <p className="text-sm text-green-700">Diskon: {formatRupiah(promoDiscount)}</p>
-                  </div>
-                  <button onClick={handleRemovePromo} className="text-danger-500 font-medium hover:bg-danger-50 p-2 rounded-lg">Hapus</button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={promoCodeInput}
-                    onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-                    placeholder="Masukkan kode promo..."
-                    className="flex-1 border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary-500 uppercase"
-                  />
-                  <button
-                    onClick={handleApplyPromo}
-                    disabled={!promoCodeInput || isApplyingPromo}
-                    className="bg-primary-600 text-white font-bold px-4 rounded-xl disabled:opacity-50"
-                  >
-                    {isApplyingPromo ? "Cek..." : "Terapkan"}
-                  </button>
-                </div>
-              )}
-            </div>
-    
-            {/* Payment Methods */}
+          {/* Payment Methods */}
             <h3 className="font-bold text-gray-800 mb-3">Metode Pembayaran</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {(["CASH", "QRIS", "TRANSFER", "DEBIT_CREDIT"] as PaymentMethod[]).map(method => (
@@ -596,7 +420,7 @@ export default function KasirClient({ products, customers }: { products: any[], 
 
             <div className="space-y-3 text-sm border-t border-dashed border-gray-200 pt-4">
                <div className="flex justify-between"><span className="text-gray-500 font-medium">Subtotal</span><span className="font-bold text-gray-700">{formatRupiah(subtotal)}</span></div>
-               {promoDiscount > 0 && <div className="flex justify-between text-success-600"><span className="font-medium">Diskon Promo</span><span className="font-bold">-{formatRupiah(promoDiscount)}</span></div>}
+               
             </div>
           </div>
           

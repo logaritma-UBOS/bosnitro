@@ -8,7 +8,6 @@ import { formatRupiah } from '@/lib/format'
 import { deleteIngredient, deleteProduct } from './actions'
 
 import SupabaseImportModal from './SupabaseImportModal'
-import BulkSupplierModal from './BulkSupplierModal'
 
 export default function KatalogListClient({
   ingredients,
@@ -27,15 +26,6 @@ export default function KatalogListClient({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
-  const [showBulkModal, setShowBulkModal] = useState(false);
-  const [tier, setTier] = useState<string>("Starter");
-
-  useEffect(() => {
-    fetch("/api/user/status").then(r => r.json()).then(d => {
-      setTier(d.tier || "Starter")
-    }).catch(() => {})
-  }, [])
-
   const filteredMaterials = useMemo(() => {
     if (!searchQuery.trim()) return ingredients;
     return ingredients.filter(item => 
@@ -53,8 +43,6 @@ export default function KatalogListClient({
   return (
     <div className="space-y-6">
       {showImportModal && <SupabaseImportModal onClose={() => setShowImportModal(false)} />}
-      {showBulkModal && <BulkSupplierModal onClose={() => setShowBulkModal(false)} products={products} ingredients={ingredients} suppliers={suppliers} />}
-      
       {/* Cari & Filter */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -97,9 +85,6 @@ export default function KatalogListClient({
             <div className="flex justify-between items-start mb-1 gap-2">
               <h2 className="text-sm md:text-base font-bold text-gray-800 tracking-wide mt-1 shrink-0">{ingredientsTitle}</h2>
               <div className="flex gap-2 flex-wrap justify-end">
-                <button onClick={() => setShowBulkModal(true)} className="text-emerald-700 text-sm font-bold bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                </button>
                 <Link href="/katalog/bahan/tambah" className="text-primary-700 text-sm font-bold bg-primary-50 px-3 py-1 rounded-lg hover:bg-primary-100 transition-colors">+ Tambah</Link>
               </div>
             </div>
@@ -145,26 +130,13 @@ export default function KatalogListClient({
             <div className="flex justify-between items-start mb-1 gap-2">
               <h2 className="text-sm md:text-base font-bold text-gray-800 tracking-wide mt-1 shrink-0">Produk Jualan</h2>
               <div className="flex gap-2 flex-wrap justify-end">
-                <button onClick={() => setShowBulkModal(true)} className="text-emerald-700 text-sm font-bold bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                  <span className="hidden sm:inline">Atur</span> Supplier
-                </button>
                 <button onClick={() => setShowImportModal(true)} className="text-emerald-700 text-sm font-bold bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                   <span className="hidden sm:inline">Import</span>
                 </button>
-                {tier === "Starter" && products.length >= 15 ? (
-                  <button 
-                    onClick={() => alert("Batas Starter 15 Produk telah tercapai. Silakan upgrade ke Pro/Lifetime untuk katalog unlimited.")}
-                    className="text-gray-400 text-sm font-bold bg-gray-100 px-3 py-1 rounded-lg cursor-not-allowed"
-                  >
-                    + Tambah (Maks 15)
-                  </button>
-                ) : (
-                  <Link href="/katalog/produk/tambah" className="text-primary-700 text-sm font-bold bg-primary-50 px-3 py-1 rounded-lg hover:bg-primary-100 transition-colors">
+                <Link href="/katalog/produk/tambah" className="text-primary-700 text-sm font-bold bg-primary-50 px-3 py-1 rounded-lg hover:bg-primary-100 transition-colors">
                     + Tambah
                   </Link>
-                )}
               </div>
             </div>
 

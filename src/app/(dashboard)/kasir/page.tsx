@@ -12,10 +12,7 @@ export default async function KasirPage() {
   const business = await prisma.business.findFirst({ where: whereClause })
   if (!business) redirect("/")
 
-  const [products, customers] = await Promise.all([
-    prisma.product.findMany({ where: { businessId: business.id, isActive: true } }),
-    prisma.customer.findMany({ where: { businessId: business.id } })
-  ])
+  const products = await prisma.product.findMany({ where: { businessId: business.id, isActive: true } });
 
   // Get retail product stocks
   const retailProducts = products.filter(p => !p.hasBOM && p.trackInventory)
@@ -40,4 +37,4 @@ export default async function KasirPage() {
     return { ...p, stock }
   })
 
-  return <KasirClient products={productsWithStock as any} customers={customers} />}
+  return <KasirClient products={productsWithStock as any} />}

@@ -13,19 +13,17 @@ import ProfileMenu from "@/components/ProfileMenu"
 import NotificationBell from "@/components/NotificationBell"
 import LandingPage from "@/components/LandingPage"
 import UbosFeed from "@/components/dashboard/UbosFeed"
-import VipBannerWrapper from "@/components/dashboard/VipBannerWrapper"
 import InstallAppButton from "@/components/InstallAppButton"
-import { calculateTierFromRevenues, syncUserMayarPayment } from "@/lib/mayarSync"
 
 // Maps recommendation type  contextual CTA label + destination
 function getContextualCTA(type: string | undefined): { label: string; href: string } {
   switch (type) {
     case "AOV":       return { label: "Buka Kasir & Up-Sell", href: "/kasir" }
-    case "TRANSACTION": return { label: "Buat Promo Sekarang", href: "/promo" }
+    case "TRANSACTION": return { label: "Buat Promo Sekarang", href: "/kasir" }
     case "STOCK":     return { label: "Cek & Tambah Stok", href: "/katalog" }
     case "MARGIN":    return { label: "Periksa HPP Produk", href: "/katalog" }
     case "DATA":      return { label: "Catat Transaksi", href: "/kasir" }
-    case "SUCCESS":   return { label: "Lihat Performa", href: "/wawasan-bisnis" }
+    case "SUCCESS":   return { label: "Lihat Performa", href: "/performa-produk" }
     default:          return { label: "Buka Kasir", href: "/kasir" }
   }
 }
@@ -57,21 +55,7 @@ export default async function Home() {
 
   trackEvent(business.id, "dashboard_viewed").catch(() => {})
 
-  const revenues = await prisma.ubosRevenue.findMany({
-    where: { userId: business.userId, status: "PAID" },
-    orderBy: { createdAt: "desc" }
-  });
-
-  let tierStatus = calculateTierFromRevenues(business.user?.email, revenues);
-
-  if (tierStatus.tier === "Starter" && business.user?.email) {
-    const syncRes = await syncUserMayarPayment(business.user.email, business.userId);
-    if (syncRes?.tierStatus && syncRes.tierStatus.tier !== "Starter") {
-      tierStatus = syncRes.tierStatus;
-    }
-  }
-
-  const tier = tierStatus.tier;
+  const tier = "Pro";
 
   const {
     targetHarian,
@@ -153,60 +137,6 @@ export default async function Home() {
         </div>
 
         <InstallAppButton />
-
-        {tier === "Starter" && (
-          <div className="bg-gradient-to-r from-amber-100 to-amber-50 rounded-2xl p-4 mb-6 border border-amber-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <span className="text-xl">⭐</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-amber-900 text-sm">Paket Starter (Batas 15 Produk)</h3>
-                <p className="text-amber-800 text-xs mt-1">Buka Kuota Unlimited Katalog & Rekomendasi AI Bisnis Harian seharga Rp49rb/bulan.</p>
-              </div>
-            </div>
-            <Link href="/upgrade" className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2 rounded-lg text-center transition-colors">
-              Tingkatkan Sekarang
-            </Link>
-          </div>
-        )}
-
-        {(tier === "Pro Bulanan" || tier === "Pro Tahunan") && (
-          <div className="bg-gradient-to-r from-emerald-100 to-emerald-50 rounded-2xl p-4 mb-6 border border-emerald-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <span className="text-xl">💎</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-emerald-900 text-sm">Paket {tierStatus.planName} Aktif</h3>
-                <p className="text-emerald-800 text-xs mt-1">
-                  {tierStatus.daysRemaining !== null 
-                    ? `Sisa masa aktif: ${tierStatus.daysRemaining} hari lagi. Semua fitur premium terbuka tanpa batas.`
-                    : "Semua fitur premium terbuka tanpa batas."}
-                </p>
-              </div>
-            </div>
-            <Link href="/upgrade" className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg text-center transition-colors">
-              Perpanjang Paket
-            </Link>
-          </div>
-        )}
-
-        {tier === "Lifetime" && (
-          <div className="bg-gradient-to-r from-blue-100 to-blue-50 rounded-2xl p-4 mb-6 border border-blue-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <span className="text-xl">👑</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-blue-900 text-sm">Lifetime Founder Pass Aktif</h3>
-                <p className="text-blue-800 text-xs mt-1">Akses eksklusif seumur hidup. Terima kasih atas dukungan Anda.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <VipBannerWrapper />
 
         {/* GLOBAL NOTIFICATION */}
         {notifSetting.active === "true" && notifSetting.text && (
@@ -337,36 +267,7 @@ export default async function Home() {
             )}
 
             {/*  CARD 3: PRIORITAS HARI INI (Diagnosis  Evidence  Action)  */}
-            {tier === "Starter" ? (
-              <div className="rounded-3xl p-6 relative overflow-hidden bg-gray-50 border border-gray-200 opacity-90">
-                <div className="absolute top-0 right-0 p-5 opacity-10 pointer-events-none select-none">
-                  <IconInsights className="w-28 h-28 text-gray-400" />
-                </div>
-                <div className="relative z-10">
-                  <div className="flex items-start justify-between gap-3 mb-5">
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.12em]">Prioritas Hari Ini</p>
-                    </div>
-                    <div className="px-2 py-1 rounded-full bg-amber-100 border border-amber-200 shadow-sm shrink-0">
-                      <span className="text-[9px] font-bold text-amber-800">Fitur Terkunci</span>
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-black text-gray-900 leading-snug mb-3">
-                    Insight Rekomendasi Harian
-                  </h3>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 lg:p-5 border border-white shadow-sm mb-5">
-                    <p className="text-sm font-medium text-gray-600 leading-relaxed">
-                      Upgrade ke paket Pro atau Lifetime untuk mendapatkan rekomendasi AI harian yang dianalisis otomatis dari pola transaksi dan inventaris bisnis Anda.
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-end">
-                    <Link href="/upgrade" className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gray-900 text-white font-bold text-sm shadow-sm hover:bg-gray-800 transition-all active:scale-[0.98]">
-                      Upgrade Sekarang
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ) : rekomendasiUtama && (
+            {rekomendasiUtama && (
               <div className={`rounded-3xl p-6 relative overflow-hidden ${
                 rekomendasiUtama.type === "SUCCESS"
                   ? "bg-success-50 border border-success-200"
