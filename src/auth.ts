@@ -18,15 +18,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   basePath: "/api/auth",
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "ubos_secret_key_logaritma_2026_supersecure_auth_token_xyz99",
+  secret: (process.env.AUTH_SECRET && !process.env.AUTH_SECRET.includes('[SENSITIVE]'))
+    ? process.env.AUTH_SECRET
+    : (process.env.NEXTAUTH_SECRET && !process.env.NEXTAUTH_SECRET.includes('[SENSITIVE]'))
+      ? process.env.NEXTAUTH_SECRET
+      : "ubos_secret_key_logaritma_2026_supersecure_auth_token_xyz99",
   session: {
     strategy: "jwt",
   },
   trustHost: true,
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || process.env.AUTH_GOOGLE_ID || "dummy_google_id",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.AUTH_GOOGLE_SECRET || "dummy_google_secret",
+      clientId: (process.env.GOOGLE_CLIENT_ID && !process.env.GOOGLE_CLIENT_ID.includes('[SENSITIVE]')) ? process.env.GOOGLE_CLIENT_ID : "dummy_google_id",
+      clientSecret: (process.env.GOOGLE_CLIENT_SECRET && !process.env.GOOGLE_CLIENT_SECRET.includes('[SENSITIVE]')) ? process.env.GOOGLE_CLIENT_SECRET : "dummy_google_secret",
       allowDangerousEmailAccountLinking: true,
     }),
     Credentials({
