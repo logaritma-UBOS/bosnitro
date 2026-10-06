@@ -1,0 +1,58 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js build output
+/.next/
+/out/
+/build/
+
+# Production / Cache
+*.tsbuildinfo
+next-env.d.ts
+
+# SQLite local databases and logs
+dev.db
+dev.db-journal
+dev.db.bak
+*.db
+*.db-journal
+*.wal
+auth
+auth-wal
+db
+db-wal
+
+# Environment files (keep .env.example tracked)
+.env
+.env.local
+.env.production
+.env.production.local
+.env.prod
+.env.prod.local
+.env.backup
+!.env.example
+
+# Backups & safety dumps
+.backup_safety
+*.html
+*.bak
+
+# Vercel & IDE
+.vercel
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

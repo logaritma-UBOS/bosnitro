@@ -1,0 +1,2 @@
+ALTER TABLE "BusinessSetting" ADD COLUMN "fonnteToken" TEXT;
+ALTER TABLE "BusinessSetting" ADD COLUMN "waStatus" TEXT NOT NULL DEFAULT 'DISCONNECTED';

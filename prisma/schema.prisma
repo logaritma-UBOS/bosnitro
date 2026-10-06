@@ -1,0 +1,583 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 1. Core, Auth & Settings
+model User {
+  id              String    @id @default(uuid()) // standard NextAuth wants cuid, but uuid is fine too
+  name            String? // made optional for NextAuth standard
+  email           String    @unique
+  emailVerified   DateTime?
+  image           String?
+  phone           String?
+  passwordHash    String? // made optional since OAuth users won't have one
+  role            String    @default("OWNER")
+  staffBusinessId String?
+  staffBusiness   Business? @relation("BusinessStaffs", fields: [staffBusinessId], references: [id], onDelete: SetNull)
+  crmStatus       String    @default("PASIF")
+  lastLogin       DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  accounts        Account[]
+  sessions        Session[]
+  businesses      Business[]
+  supportMessages SupportMessage[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Business {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  name          String
+  businessType  String
+  operatingDays Int      @default(7)
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+
+  settings        BusinessSetting?
+  staffs          User[]                   @relation("BusinessStaffs")
+  auditLogs       AuditLog[]
+  categories      ProductCategory[]
+  products        Product[]
+  ingredients     Ingredient[]
+  recipes         Recipe[]
+  stockMovements  StockMovement[]
+  sales           Sale[]
+  saleItems       SaleItem[]
+  expenses        Expense[]
+  incomes         Income[]
+  customers       Customer[]
+  goals           Goal[]
+  metrics         BusinessMetricSnapshot[]
+  recommendations Recommendation[]
+  syncQueues      SyncQueue[]
+  promos          Promo[]
+  contentPlans    ContentPlan[]
+  campaigns       Campaign[]
+  suppliers       Supplier[]
+}
+
+model BusinessSetting {
+  id            String   @id @default(uuid())
+  businessId    String   @unique
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  baseCurrency  String   @default("IDR")
+  timezone      String   @default("Asia/Jakarta")
+  taxRate       Float    @default(0)
+  receiptFooter String?
+  storeAddress  String?
+  storePhone    String?
+  fonnteToken   String?
+  waStatus      String   @default("DISCONNECTED")
+
+  // TOKO ONLINE SETTINGS
+  storeSlug        String? @unique
+  storeDescription String?
+  storeActive      Boolean @default(false)
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId      String?
+  action      String
+  resource    String
+  detailsJson String?
+  createdAt   DateTime @default(now())
+}
+
+// 2. Catalog, Recipe & Stock (Barang & Produk)
+model ProductCategory {
+  id         String    @id @default(uuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  products   Product[]
+}
+
+model Product {
+  id               String           @id @default(uuid())
+  businessId       String
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId       String?
+  category         ProductCategory? @relation(fields: [categoryId], references: [id])
+  name             String
+  imageUrl         String?
+  imagePublicId    String?
+  sellPrice        Float
+  calculatedHpp    Float            @default(0)
+  calculatedMargin Float            @default(0)
+  isActive         Boolean          @default(true)
+  showInStore      Boolean          @default(true) // TOKO ONLINE VISIBILITY
+
+  // Phase 1: Unified Item Behavior Flags
+  currentStock   Float     @default(0)
+  minStock       Float     @default(0)
+  isSellable     Boolean   @default(true)
+  supplierId     String?
+  supplier       Supplier? @relation(fields: [supplierId], references: [id])
+  isPurchasable  Boolean   @default(false)
+  trackInventory Boolean   @default(false)
+  hasBOM         Boolean   @default(false)
+  purchaseCost   Float     @default(0) // Phase 3
+
+  recipes        Recipe[]
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+}
+
+model Ingredient {
+  id           String   @id @default(uuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name         String
+  unit         String
+  costPerUnit  Float
+  currentStock Float    @default(0)
+  minStock     Float    @default(0)
+
+  // Phase 1: Unified Item Behavior Flags
+  isSellable     Boolean   @default(false)
+  supplierId     String?
+  supplier       Supplier? @relation(fields: [supplierId], references: [id])
+  isPurchasable  Boolean   @default(true)
+  trackInventory Boolean   @default(true)
+  hasBOM         Boolean   @default(false)
+
+  recipes        Recipe[]
+  stockMovements StockMovement[]
+}
+
+model Recipe {
+  id             String     @id @default(uuid())
+  businessId     String
+  business       Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredientId   String
+  ingredient     Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  quantityNeeded Float
+}
+
+// 2. Inventory (Gudang)
+model StockMovement {
+  id            String      @id @default(uuid())
+  businessId    String
+  business      Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  ingredientId  String?
+  ingredient    Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type          String // IN, OUT, WASTE, SALE
+  quantity      Float
+  referenceId   String?
+  referenceType String? // SALE, PURCHASE, ADJUSTMENT
+  date          DateTime    @default(now())
+  supplierId    String?
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id])
+  notes         String?
+}
+
+// 3. Sales & Transactions (Jualan)
+model Sale {
+  id                  String     @id @default(uuid())
+  businessId          String
+  business            Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  clientTransactionId String     @unique
+  receiptNumber       String?
+  totalAmount         Float
+  discount            Float      @default(0)
+  paymentMethod       String // CASH, QR, TRANSFER
+  cashReceived        Float?
+  changeAmount        Float?
+  customerId          String?
+  customer            Customer?  @relation(fields: [customerId], references: [id])
+  promoId             String?
+  promo               Promo?     @relation(fields: [promoId], references: [id])
+  campaignId          String?
+  campaign            Campaign?  @relation(fields: [campaignId], references: [id])
+  syncStatus          String     @default("SYNCED") // LOCAL, PENDING, SYNCED, FAILED
+  createdAt           DateTime   @default(now())
+  syncedAt            DateTime?
+  saleItems           SaleItem[]
+}
+
+model SaleItem {
+  id          String   @id @default(uuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  priceAtSale Float
+  hppAtSale   Float
+}
+
+// 4. Finance (Keuangan Dasar)
+model Expense {
+  id          String   @id @default(uuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category    String
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+}
+
+model Income {
+  id          String   @id @default(uuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  source      String
+  amount      Float
+  description String?
+  date        DateTime @default(now())
+}
+
+// 5. Customer & Metrics (Loyalty & Target)
+model Customer {
+  id               String    @id @default(uuid())
+  businessId       String
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name             String
+  phone            String?
+  totalPurchases   Int       @default(0)
+  lastPurchaseDate DateTime?
+  category         String? // BARU, AKTIF, LAMA
+  sales            Sale[]
+}
+
+model Goal {
+  id                String   @id @default(uuid())
+  businessId        String
+  business          Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  targetOmzet       Float
+  targetProfit      Float?
+  targetTransaction Int?
+  period            String // BULANAN, HARIAN
+}
+
+model BusinessMetricSnapshot {
+  id                     String   @id @default(uuid())
+  businessId             String
+  business               Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  date                   DateTime @default(now())
+  omzetAktual            Float    @default(0)
+  aovAktual              Float    @default(0)
+  transactionCountAktual Int      @default(0)
+  hppTotal               Float    @default(0)
+}
+
+// Recommendation & Sync
+model Recommendation {
+  id             String   @id @default(uuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  date           DateTime @default(now())
+  metricType     String // OMZET, AOV, FREQUENCY
+  currentValue   Float
+  targetValue    Float
+  gap            Float
+  dataConfidence String // LOW, MEDIUM, HIGH
+  causeText      String
+  actionText     String
+  priorityScore  Int // 1-100
+  status         String   @default("TODO") // TODO, IN_PROGRESS, DISMISSED, COMPLETED
+}
+
+model SyncQueue {
+  id                  String    @id @default(uuid())
+  businessId          String
+  business            Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  clientTransactionId String    @unique
+  payloadJson         String
+  status              String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  retryCount          Int       @default(0)
+  lastAttempt         DateTime?
+}
+
+// 6. Promo Engine
+model Promo {
+  id              String     @id @default(uuid())
+  businessId      String
+  business        Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name            String
+  code            String
+  discountType    String // PERCENTAGE, FIXED
+  discountValue   Float
+  minimumPurchase Float?
+  startAt         DateTime?
+  endAt           DateTime?
+  maxUsage        Int?
+  usageCount      Int        @default(0)
+  targetSegment   String? // BARU, AKTIF, LOYAL, dll
+  isActive        Boolean    @default(true)
+  sales           Sale[]
+  campaigns       Campaign[]
+
+  @@unique([businessId, code])
+}
+
+// 7. Content Planner
+model ContentPlan {
+  id         String     @id @default(uuid())
+  businessId String
+  business   Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  title      String
+  platform   String // TIKTOK, INSTAGRAM, FACEBOOK, WHATSAPP_STATUS
+  status     String // DRAFT, SIAP_POSTING, SUDAH_POSTING
+  cta        String?
+  targetUrl  String?
+  postDate   DateTime?
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  campaigns  Campaign[]
+}
+
+// 8. Marketing Campaigns (WhatsApp Blast layer)
+model Campaign {
+  id            String       @id @default(uuid())
+  businessId    String
+  business      Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name          String
+  contentPlanId String?
+  contentPlan   ContentPlan? @relation(fields: [contentPlanId], references: [id])
+  targetSegment String // BARU, AKTIF, LOYAL, BERISIKO, TIDAK_AKTIF, SEMUA
+  message       String?
+  cta           String?
+  promoId       String?
+  promo         Promo?       @relation(fields: [promoId], references: [id])
+  linkUrl       String?
+  status        String       @default("DRAFT") // DRAFT, SIAP_DIKIRIM, TERKIRIM, SELESAI
+  sentAt        DateTime?
+
+  sales Sale[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- OWNER BACKEND MODELS ---
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OwnerAction {
+  id         String  @id @default(uuid())
+  actionType String
+  source     String
+  metric     String
+  goal       String?
+  target     Float?
+
+  actualBefore Float?
+  gapBefore    Float?
+
+  actualAfter Float?
+  gapAfter    Float?
+
+  gap            Float? // Legacy field, keeping for safety, use gapBefore/gapAfter
+  recommendation String?
+
+  severity   String?
+  confidence String?
+  direction  String? @default("HIGHER_IS_BETTER")
+
+  status String @default("RECOMMENDED")
+
+  expectedResult String?
+  actualResult   String?
+  evaluation     String?
+  learningResult String? // SUCCESS, FAILED, NO_CHANGE
+  nextAction     String?
+  ownerNote      String?
+
+  acceptedAt  DateTime?
+  executedAt  DateTime?
+  evaluatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model OwnerCampaign {
+  id             String  @id @default(uuid())
+  name           String
+  objective      String
+  targetSegment  String
+  trigger        String?
+  title          String?
+  message        String
+  cta            String?
+  ctaUrl         String?
+  channel        String  @default("IN_APP")
+  status         String  @default("DRAFT") // DRAFT, SIAP_UPLOAD, SELESAI
+  expectedResult String?
+
+  // Khusus Sosmed Calendar
+  driveUrl String?
+  postUrl  String?
+  author   String?
+
+  targetUsers   Int @default(0)
+  eligibleUsers Int @default(0)
+  queued        Int @default(0)
+  sent          Int @default(0)
+  delivered     Int @default(0)
+  opened        Int @default(0)
+  clicked       Int @default(0)
+  engaged       Int @default(0)
+  converted     Int @default(0)
+
+  actionId String? // Link to OwnerAction
+
+  startAt   DateTime?
+  endAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model OwnerNotification {
+  id             String    @id @default(uuid())
+  recipientId    String? // Could be User ID or null for segments
+  segment        String?
+  trigger        String
+  reason         String?
+  title          String?
+  message        String
+  cta            String?
+  ctaUrl         String?
+  priority       String    @default("LOW") // CRITICAL, HIGH, MEDIUM, LOW
+  channel        String    @default("IN_APP")
+  status         String    @default("PENDING") // PENDING, READY, SENT, FAILED, CANCELLED
+  campaignId     String?
+  actionId       String?
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  failedAt       DateTime?
+  readAt         DateTime?
+  clickedAt      DateTime?
+  idempotencyKey String?   @unique
+  retryCount     Int       @default(0)
+  lastAttemptAt  DateTime?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model OwnerOffer {
+  id               String   @id @default(uuid())
+  name             String
+  targetSegment    String
+  eligibility      String?
+  cta              String
+  recommendedOffer String?
+  status           String   @default("OFFER_NOT_CONFIGURED") // OFFER_NOT_CONFIGURED, ACTIVE, PAUSED
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// --- UBOS MONETIZATION & FEED ---
+model UbosRevenue {
+  id            String   @id @default(uuid())
+  userId        String
+  mayarTrxId    String   @unique
+  amount        Float
+  paymentMethod String?
+  status        String   @default("PAID")
+  createdAt     DateTime @default(now())
+}
+
+model UbosFeedContent {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  author    String   @default("Logaritma Team")
+  category  String   @default("TIPS")
+  status    String   @default("PUBLISHED")
+  audience  String   @default("ALL") // "ALL" | "VIP_ONLY" | "FREE_ONLY"
+  imageUrl  String?
+  ctaUrl    String?
+  createdAt DateTime @default(now())
+}
+
+model VisitorAnalytics {
+  id        String   @id @default(uuid())
+  path      String
+  referrer  String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model Supplier {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  phone      String?
+  address    String?
+  createdAt  DateTime @default(now())
+
+  stockMovements StockMovement[]
+  products       Product[]
+  ingredients    Ingredient[]
+}
+
+model SupportMessage {
+  id         String   @id @default(uuid())
+  userId     String
+  senderRole String
+  message    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

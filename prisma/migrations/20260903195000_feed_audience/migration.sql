@@ -1,0 +1,1 @@
+ALTER TABLE "UbosFeedContent" ADD COLUMN "audience" TEXT DEFAULT 'ALL' NOT NULL;
