@@ -21,7 +21,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
 
   const isLocked = (label: string) => {
     if (tier === "Starter") {
-      const lockedFeatures = ["Pelanggan", "Pengeluaran", "Stok & Supplier", "Promo", "Marketing", "Konten"]
+      const lockedFeatures = ["Pelanggan", "Pengeluaran", "Stok & Supplier"]
       return lockedFeatures.includes(label)
     }
     return false
@@ -52,17 +52,8 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
       ]
     },
     {
-      title: "TUMBUH",
-      links: [
-        { label: "Konten", href: "/konten", icon: "📝" },
-        { label: "Promo", href: "/promo", icon: "🎟️" },
-        { label: "Marketing", href: "/marketing", icon: "📱" },
-      ]
-    },
-    {
       title: "PAHAMI BISNIS",
       links: [
-        { label: "Analisis Bisnis", href: "/wawasan-bisnis", icon: "📊" },
         { label: "Performa Produk", href: "/performa-produk", icon: "📈" },
         { label: "Rata-rata Belanja", href: "/performa-aov", icon: "💰" },
         { label: "Laporan Keuangan", href: "/laporan", icon: "📄" },
@@ -79,7 +70,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
       links: cat.links.filter(l => allowedKasir.includes(l.href))
     })).filter(cat => cat.links.length > 0);
   } else if (role === "MANAGER") {
-    const restrictedManager = ["/laporan", "/pengeluaran", "/wawasan-bisnis", "/performa-produk", "/performa-aov", "/pengaturan/target", "/pengaturan/whatsapp", "/pengaturan/pegawai"];
+    const restrictedManager = ["/laporan", "/pengeluaran", "/performa-produk", "/performa-aov", "/pengaturan/target", "/pengaturan/whatsapp", "/pengaturan/pegawai"];
     menuCategories = menuCategories.map(cat => ({
       ...cat,
       links: cat.links.filter(l => !restrictedManager.includes(l.href))

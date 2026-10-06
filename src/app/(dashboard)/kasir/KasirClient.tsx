@@ -119,19 +119,9 @@ export default function KasirClient({ products, customers }: { products: any[], 
   
   const handleApplyPromo = async () => {
     if (!promoCodeInput) return;
-    setIsApplyingPromo(true);
-    const { validatePromoCode } = await import("@/actions/promo");
-    const res = await validatePromoCode(promoCodeInput, subtotal, selectedCustomerId || undefined);
-    setIsApplyingPromo(false);
-    
-    if (res.error) {
-      alert(res.error);
-      setAppliedPromo(null);
-      setPromoDiscount(0);
-    } else {
-      setAppliedPromo(res.promo);
-      setPromoDiscount(res.discountAmount || 0);
-    }
+    alert("Fitur promo saat ini sedang tidak aktif.");
+    setAppliedPromo(null);
+    setPromoDiscount(0);
   }
 
   const handleRemovePromo = () => {
