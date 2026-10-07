@@ -166,7 +166,9 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
   success: boolean
   message: string
   reportText: string
+  cleanText: string
   shareUrl: string
+  whatsappUrl: string
 }> {
   const recipient = targetRecipient || activeTelegramRecipient
   const { reportText, branchName } = await generateDailyBranchReportText(branchId, recipient)
@@ -178,6 +180,11 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
 
   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent("https://ubos.id")}&text=${encodeURIComponent(cleanTextForUrl)}`
 
+  // Direct WhatsApp link as reliable alternative
+  let waPhone = recipient.replace(/[^0-9]/g, "")
+  if (waPhone.startsWith("0")) waPhone = "62" + waPhone.substring(1)
+  const whatsappUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(cleanTextForUrl)}`
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
 
@@ -185,9 +192,11 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
     console.log(`[Telegram Bot Report to ${recipient}] (Bot token/chatId belum diset di .env):\n${cleanTextForUrl}`)
     return {
       success: true,
-      message: `Laporan cabang "${branchName}" berhasil dibuat untuk nomor ${recipient}. Link Telegram siap digunakan.`,
+      message: `Laporan cabang "${branchName}" berhasil disiapkan untuk ${recipient}. Teks siap disalin atau dibuka via Telegram/WhatsApp.`,
       reportText,
+      cleanText: cleanTextForUrl,
       shareUrl,
+      whatsappUrl,
     }
   }
 
@@ -207,25 +216,31 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
         success: true,
         message: `Laporan cabang "${branchName}" berhasil dikirim langsung ke Telegram bot penerima ${recipient}.`,
         reportText,
+        cleanText: cleanTextForUrl,
         shareUrl,
+        whatsappUrl,
       }
     } else {
       const errJson = await res.json().catch(() => ({}))
       console.warn("[Telegram Bot API Response Warning]:", errJson)
       return {
         success: true,
-        message: `Laporan cabang "${branchName}" siap dikirim via link Telegram langsung ke nomor ${recipient}.`,
+        message: `Laporan cabang "${branchName}" siap dikirim via Telegram atau WhatsApp ke ${recipient}.`,
         reportText,
+        cleanText: cleanTextForUrl,
         shareUrl,
+        whatsappUrl,
       }
     }
   } catch (error: any) {
     console.error("[Telegram Bot API Send Error]:", error)
     return {
       success: true,
-      message: `Laporan cabang "${branchName}" siap dikirim via link Telegram ke ${recipient}.`,
+      message: `Laporan cabang "${branchName}" siap dikirim via Telegram atau WhatsApp ke ${recipient}.`,
       reportText,
+      cleanText: cleanTextForUrl,
       shareUrl,
+      whatsappUrl,
     }
   }
 }

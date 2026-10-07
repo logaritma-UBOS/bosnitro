@@ -21,6 +21,8 @@ import {
   CheckCircle2,
   ArrowRight,
   X,
+  Copy,
+  MessageCircle,
 } from "lucide-react"
 
 export default function OwnerDashboardInterlockingClient({
@@ -52,12 +54,17 @@ export default function OwnerDashboardInterlockingClient({
   // Telegram report state
   const [sendingTelegram, setSendingTelegram] = useState(false)
   const [telegramStatus, setTelegramStatus] = useState<string | null>(null)
+  const [telegramCleanText, setTelegramCleanText] = useState<string | null>(null)
   const [telegramShareUrl, setTelegramShareUrl] = useState<string | null>(null)
+  const [telegramWhatsappUrl, setTelegramWhatsappUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const handleSendTelegramReport = async () => {
     setSendingTelegram(true)
     setTelegramStatus(null)
+    setTelegramCleanText(null)
     setTelegramShareUrl(null)
+    setTelegramWhatsappUrl(null)
     try {
       const res = await fetch("/api/telegram/daily-report", {
         method: "POST",
@@ -69,13 +76,21 @@ export default function OwnerDashboardInterlockingClient({
       })
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Gagal memproses pengiriman")
-      setTelegramStatus(data.message || `Laporan transaksi harian berhasil disiapkan untuk Telegram (${telegramPhone}).`)
+      setTelegramStatus(data.message || `Laporan transaksi harian siap untuk ${telegramPhone}.`)
+      if (data.cleanText) setTelegramCleanText(data.cleanText)
       if (data.shareUrl) setTelegramShareUrl(data.shareUrl)
+      if (data.whatsappUrl) setTelegramWhatsappUrl(data.whatsappUrl)
     } catch (err: any) {
       alert("Error: " + err.message)
     } finally {
       setSendingTelegram(false)
     }
+  }
+
+  const handleCopyReport = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
   }
 
   // Filter based on active branch selector
@@ -128,7 +143,7 @@ export default function OwnerDashboardInterlockingClient({
             className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
-            <span>{sendingTelegram ? "Mengirim Laporan..." : `Kirim Laporan ke Telegram (${telegramPhone})`}</span>
+            <span>{sendingTelegram ? "Menyiapkan..." : `Kirim Laporan ke Telegram (${telegramPhone})`}</span>
           </button>
           <div className="w-full sm:w-64">
             <BranchSelector allowAll={true} />
@@ -146,17 +161,45 @@ export default function OwnerDashboardInterlockingClient({
               <p className="text-xs text-sky-800 mt-0.5">{telegramStatus}</p>
             </div>
           </div>
-          {telegramShareUrl && (
-            <a
-              href={telegramShareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors shrink-0"
-            >
-              <span>Buka di Telegram</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {telegramCleanText && (
+              <button
+                type="button"
+                onClick={() => handleCopyReport(telegramCleanText)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition-colors ${
+                  copied
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copied ? "✓ Tersalin!" : "Salin Teks"}</span>
+              </button>
+            )}
+            {telegramShareUrl && (
+              <a
+                href={telegramShareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors shrink-0"
+              >
+                <span>Buka di Telegram</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {telegramWhatsappUrl && (
+              <a
+                href={telegramWhatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors shrink-0"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Kirim via WA</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
         </div>
       )}
 

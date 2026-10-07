@@ -19,6 +19,8 @@ import {
   AlertCircle,
   ExternalLink,
   Trash2,
+  Copy,
+  MessageCircle,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -39,8 +41,11 @@ export default function StoreSettingsClient({
   const [testingTelegram, setTestingTelegram] = useState(false)
   const [telegramTestResult, setTelegramTestResult] = useState<{
     message: string
+    cleanText?: string
     shareUrl?: string
+    whatsappUrl?: string
   } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // Add branch modal state
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false)
@@ -128,14 +133,22 @@ export default function StoreSettingsClient({
       }
 
       setTelegramTestResult({
-        message: data.message || "Format laporan telegram siap!",
+        message: data.message || "Format laporan berhasil disiapkan!",
+        cleanText: data.cleanText,
         shareUrl: data.shareUrl,
+        whatsappUrl: data.whatsappUrl,
       })
     } catch (err: any) {
       alert("Error: " + err.message)
     } finally {
       setTestingTelegram(false)
     }
+  }
+
+  const handleCopyReport = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
   }
 
   const handleDeleteBranch = async (branchId: string, branchName: string) => {
@@ -271,36 +284,76 @@ export default function StoreSettingsClient({
                 Tersinkronisasi otomatis dengan nomor telepon akun saat registrasi. Laporan omzet harian per cabang dan alert anomali sensor flow meter dikirimkan ke nomor ini.
               </p>
 
-              {/* Tombol Uji Coba Laporan Telegram */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleTestTelegram}
-                  disabled={testingTelegram}
-                  className="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{testingTelegram ? "Menguji..." : "Uji Coba Kirim Laporan ke Telegram"}</span>
-                </button>
-
-                {telegramTestResult?.shareUrl && (
-                  <a
-                    href={telegramTestResult.shareUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl transition-colors"
+              {/* Tombol Uji Coba Laporan Telegram & Opsi Fleksibel */}
+              <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleTestTelegram}
+                    disabled={testingTelegram}
+                    className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
                   >
-                    <span>Buka Teks Laporan di Telegram</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                )}
-              </div>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{testingTelegram ? "Menyiapkan..." : "Uji Coba Laporan"}</span>
+                  </button>
 
-              {telegramTestResult && (
-                <p className="text-[11px] text-sky-800 mt-1.5 font-medium">
-                  ✓ {telegramTestResult.message}
-                </p>
-              )}
+                  {telegramTestResult?.cleanText && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopyReport(telegramTestResult.cleanText!)}
+                      className={`px-3.5 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors border ${
+                        copied
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copied ? "✓ Teks Laporan Berhasil Disalin!" : "Salin Teks Laporan"}</span>
+                    </button>
+                  )}
+
+                  {telegramTestResult?.shareUrl && (
+                    <a
+                      href={telegramTestResult.shareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs rounded-xl transition-colors"
+                    >
+                      <span>Buka di Telegram</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+
+                  {telegramTestResult?.whatsappUrl && (
+                    <a
+                      href={telegramTestResult.whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs rounded-xl transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Kirim via WhatsApp Langsung</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+
+                {telegramTestResult && (
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    {telegramTestResult.message}
+                  </p>
+                )}
+
+                <div className="text-[10px] text-slate-500 bg-white p-3 rounded-xl border border-slate-200/60 space-y-1">
+                  <p className="font-bold text-slate-700">💡 Mengapa muncul tombol Share di Telegram?</p>
+                  <p>
+                    Tautan <code className="text-sky-600">t.me/share</code> adalah tautan pengirim bawaan Telegram. Di perangkat komputer, tombol <b>SHARE</b> di web tersebut memerlukan aplikasi Telegram Desktop terpasang.
+                  </p>
+                  <p>
+                    Sebagai alternatif yang 100% praktis, Anda bisa langsung klik tombol <b>Salin Teks Laporan</b> di atas (lalu Paste ke Telegram Web/grup) atau klik <b>Kirim via WhatsApp Langsung</b> ke nomor Anda!
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="pt-3 flex justify-end">
@@ -375,7 +428,7 @@ export default function StoreSettingsClient({
 
               <div className="pt-3 mt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">
-                  {index === 0 ? "Cabang Pusat" : `Cabang Cabang #${index + 1}`}
+                  {index === 0 ? "Cabang Pusat" : `Cabang #${index + 1}`}
                 </span>
                 {branches.length > 1 && index !== 0 && (
                   <button
