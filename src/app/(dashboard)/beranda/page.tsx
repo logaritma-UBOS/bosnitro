@@ -11,7 +11,6 @@ import { IconHome, IconCatalog, IconHistory, IconInsights, IconWarning, IconCash
 import { trackEvent } from "@/actions/analytics"
 import ProfileMenu from "@/components/ProfileMenu"
 import NotificationBell from "@/components/NotificationBell"
-import LandingPage from "@/components/LandingPage"
 import UbosFeed from "@/components/dashboard/UbosFeed"
 import InstallAppButton from "@/components/InstallAppButton"
 
