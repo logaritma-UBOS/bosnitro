@@ -2,15 +2,23 @@ export type Branch = {
   id: string
   name: string
   location: string
+  deviceId?: string | null
+  status?: "ONLINE" | "OFFLINE"
   createdAt?: string | Date
 }
 
+// Saat awal pendaftaran/setup, hanya 1 cabang awal secara default
 export const DEFAULT_BRANCHES: Branch[] = [
-  { id: "branch-tambun-1", name: "Tambun 1", location: "Jl. Sultan Hasanudin, Tambun Selatan" },
-  { id: "branch-tambun-2", name: "Tambun 2", location: "Jl. Rawa Kalong, Tambun Utara" },
-  { id: "branch-cibitung-1", name: "Cibitung 1", location: "Jl. Raya Fatahillah, Cibitung" },
-  { id: "branch-cibitung-2", name: "Cibitung 2", location: "Jl. Selang Cau, Wanasari, Cibitung" },
+  { id: "branch-utama", name: "Cabang Utama", location: "Jl. Sultan Hasanudin, Tambun Selatan" },
 ]
+
+export type StoreProfileSettings = {
+  storeName: string
+  profileImage: string | null
+  telegramPhone: string
+  userEmail?: string
+  userName?: string
+}
 
 export type ProductCategoryType = "NITROGEN" | "RETAIL"
 export type VehicleType = "MOTOR" | "MOBIL" | null

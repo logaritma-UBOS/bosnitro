@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { Branch, DEFAULT_BRANCHES } from "@/types/branch"
 
 type BranchContextType = {
@@ -10,6 +10,8 @@ type BranchContextType = {
   setSelectedBranchId: (id: string) => void
   isAllBranches: boolean
   setIsAllBranches: (val: boolean) => void
+  addBranch: (newBranch: Branch) => void
+  refreshBranches: () => Promise<void>
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined)
@@ -17,9 +19,27 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined)
 const STORAGE_KEY = "ubos_selected_branch_id"
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
-  const [branches] = useState<Branch[]>(DEFAULT_BRANCHES)
+  const [branches, setBranches] = useState<Branch[]>(DEFAULT_BRANCHES)
   const [selectedBranchId, setSelectedBranchIdState] = useState<string>(DEFAULT_BRANCHES[0].id)
   const [isAllBranches, setIsAllBranches] = useState<boolean>(false)
+
+  const refreshBranches = useCallback(async () => {
+    try {
+      const res = await fetch("/api/branches")
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          setBranches(data)
+        }
+      }
+    } catch (e) {
+      // Offline fallback
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshBranches()
+  }, [refreshBranches])
 
   useEffect(() => {
     try {
@@ -31,11 +51,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
           setSelectedBranchIdState(saved)
           setIsAllBranches(false)
         }
+      } else if (branches.length > 0 && !branches.some(b => b.id === selectedBranchId)) {
+        // If current selectedBranchId not in branches, select first
+        setSelectedBranchIdState(branches[0].id)
       }
     } catch (e) {
       // Ignore localStorage errors
     }
-  }, [branches])
+  }, [branches, selectedBranchId])
 
   const setSelectedBranchId = (id: string) => {
     if (id === "ALL") {
@@ -52,7 +75,15 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0]
+  const addBranch = (newBranch: Branch) => {
+    setBranches(prev => {
+      if (prev.some(b => b.id === newBranch.id)) return prev
+      return [...prev, newBranch]
+    })
+    setSelectedBranchId(newBranch.id)
+  }
+
+  const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0] || DEFAULT_BRANCHES[0]
 
   return (
     <BranchContext.Provider
@@ -62,7 +93,9 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         selectedBranchId,
         setSelectedBranchId,
         isAllBranches,
-        setIsAllBranches
+        setIsAllBranches,
+        addBranch,
+        refreshBranches,
       }}
     >
       {children}

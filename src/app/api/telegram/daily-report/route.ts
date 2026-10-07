@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { sendDailyBranchReportTelegram, generateDailyBranchReportText, DEFAULT_TELEGRAM_RECIPIENT } from "@/lib/telegram"
+import { sendDailyBranchReportTelegram, generateDailyBranchReportText, getActiveTelegramRecipient } from "@/lib/telegram"
 import { auth } from "@/auth"
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const { branchId, recipient } = body
 
-    const target = recipient || DEFAULT_TELEGRAM_RECIPIENT
+    const target = recipient?.trim() || getActiveTelegramRecipient()
     const result = await sendDailyBranchReportTelegram(branchId, target)
 
     return NextResponse.json(result)
@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const branchId = searchParams.get("branchId") || undefined
-    const data = await generateDailyBranchReportText(branchId)
+    const recipient = searchParams.get("recipient") || getActiveTelegramRecipient()
+    const data = await generateDailyBranchReportText(branchId, recipient)
     return NextResponse.json({ success: true, ...data })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

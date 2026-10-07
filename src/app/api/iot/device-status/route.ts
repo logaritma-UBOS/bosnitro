@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
-import { DEFAULT_BRANCHES } from "@/types/branch"
+import { getBranches } from "@/lib/interlockingDb"
 
 export async function GET() {
-  const devices = DEFAULT_BRANCHES.map(b => ({
+  const branches = await getBranches()
+  const devices = branches.map(b => ({
     branchId: b.id,
     branchName: b.name,
     location: b.location,
-    status: "ONLINE",
+    deviceId: b.deviceId || `ESP32-${b.id.toUpperCase()}`,
+    status: b.status || "ONLINE",
     flowSensorPressure: "115 PSI",
     solenoidValveStatus: "STANDBY",
     lastHeartbeat: new Date().toISOString()

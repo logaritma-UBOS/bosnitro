@@ -1,6 +1,87 @@
-import { InterlockingProduct, InterlockingTransaction, FraudAlert, ShiftClosing, DEFAULT_BRANCHES } from "@/types/branch"
+import { Branch, InterlockingProduct, InterlockingTransaction, FraudAlert, ShiftClosing, DEFAULT_BRANCHES } from "@/types/branch"
 import { supabase } from "@/lib/supabaseClient"
 import { sendTelegramAlert } from "@/lib/telegram"
+
+// Dynamic runtime branches (starts with 1 initial branch from DEFAULT_BRANCHES, expandable)
+let runtimeBranches: Branch[] = [...DEFAULT_BRANCHES]
+
+// Dynamic runtime store settings
+let runtimeStoreSettings = {
+  storeName: "Toko meruvin",
+  profileImage: null as string | null,
+  telegramPhone: "083153598697",
+}
+
+export async function getStoreSettings(): Promise<{ storeName: string; profileImage: string | null; telegramPhone: string }> {
+  return runtimeStoreSettings
+}
+
+export async function updateStoreSettings(data: { storeName?: string; profileImage?: string | null; telegramPhone?: string }) {
+  if (data.storeName !== undefined && data.storeName.trim()) runtimeStoreSettings.storeName = data.storeName.trim()
+  if (data.profileImage !== undefined) runtimeStoreSettings.profileImage = data.profileImage
+  if (data.telegramPhone !== undefined && data.telegramPhone.trim()) runtimeStoreSettings.telegramPhone = data.telegramPhone.trim()
+  return runtimeStoreSettings
+}
+
+export async function getBranches(): Promise<Branch[]> {
+  try {
+    const { data, error } = await supabase.from("branches").select("*")
+    if (!error && data && data.length > 0) {
+      return data.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        location: d.location || "",
+        deviceId: d.device_id || `ESP32-${d.name.toUpperCase().replace(/\s+/g, "-")}`,
+        status: (d.status || "ONLINE") as "ONLINE" | "OFFLINE",
+        createdAt: d.created_at,
+      }))
+    }
+  } catch (e) {}
+
+  return runtimeBranches
+}
+
+export async function createBranch(data: { name: string; location: string; deviceId?: string }): Promise<Branch> {
+  const cleanName = data.name.trim()
+  const cleanLocation = data.location.trim()
+  const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-")
+  const branchId = `branch-${slug}-${Date.now().toString().slice(-4)}`
+
+  const newBranch: Branch = {
+    id: branchId,
+    name: cleanName,
+    location: cleanLocation,
+    deviceId: data.deviceId?.trim() || `ESP32-${slug.toUpperCase()}`,
+    status: "ONLINE",
+    createdAt: new Date().toISOString(),
+  }
+
+  runtimeBranches.push(newBranch)
+
+  // Auto-seed standard products for this new branch in runtime if needed
+  try {
+    await supabase.from("branches").insert({
+      id: newBranch.id,
+      name: newBranch.name,
+      location: newBranch.location,
+      device_id: newBranch.deviceId,
+      status: "ONLINE",
+    })
+  } catch (e) {}
+
+  return newBranch
+}
+
+export async function deleteBranch(id: string): Promise<boolean> {
+  // Prevent deleting if only 1 branch left
+  if (runtimeBranches.length <= 1) return false
+
+  runtimeBranches = runtimeBranches.filter(b => b.id !== id)
+  try {
+    await supabase.from("branches").delete().eq("id", id)
+  } catch (e) {}
+  return true
+}
 
 // In-memory / persistent runtime store for fast reactivity & offline-first capability
 let runtimeProducts: InterlockingProduct[] = [
@@ -101,15 +182,43 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
-    id: "retail-minyak-rem",
+    id: "retail-enduro",
     category: "RETAIL",
     vehicleType: null,
     serviceType: null,
-    name: "Minyak Rem Jumbo Dot 3 50ml",
-    price: 15000,
-    costPrice: 9000,
-    stock: 40,
+    name: "Pertamina Enduro 4T Racing 1L",
+    price: 58000,
+    costPrice: 47000,
+    stock: 18,
     barcode: "8999901004",
+    timerSeconds: 0,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "retail-castrol-power1",
+    category: "RETAIL",
+    vehicleType: null,
+    serviceType: null,
+    name: "Castrol Power 1 10W-40 0.8L",
+    price: 62000,
+    costPrice: 50000,
+    stock: 12,
+    barcode: "8999901005",
+    timerSeconds: 0,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "retail-motul-scooter",
+    category: "RETAIL",
+    vehicleType: null,
+    serviceType: null,
+    name: "Motul Scooter Expert LE 10W-30 0.8L",
+    price: 75000,
+    costPrice: 61000,
+    stock: 10,
+    barcode: "8999901006",
     timerSeconds: 0,
     requiresPhoto: true,
     isActive: true,
@@ -117,22 +226,22 @@ let runtimeProducts: InterlockingProduct[] = [
 ]
 
 let runtimeTransactions: InterlockingTransaction[] = []
+
 let runtimeFraudAlerts: FraudAlert[] = [
   {
-    id: "alert-sample-1",
-    branchId: "branch-tambun-1",
-    branchName: "Tambun 1",
+    id: "alert-demo-1",
+    branchId: "branch-utama",
+    branchName: "Cabang Utama",
     deviceId: "ESP32-NITRO-01",
     alertType: "UNAUTHORIZED_FLOW",
     message: "Flow sensor mendeteksi aliran gas nitrogen 22 PSI selama 8 detik tanpa ada transaksi POS tercatat!",
-    detectedAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    detectedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
   }
 ]
 let runtimeShiftClosings: ShiftClosing[] = []
 
 export async function getProducts(branchId?: string): Promise<InterlockingProduct[]> {
   try {
-    // If Supabase table exists, try fetching
     const { data, error } = await supabase.from("products").select("*")
     if (!error && data && data.length > 0) {
       return data.map((d: any) => ({
@@ -152,9 +261,7 @@ export async function getProducts(branchId?: string): Promise<InterlockingProduc
         isActive: d.is_active ?? true,
       }))
     }
-  } catch (e) {
-    // Fallback to runtime store
-  }
+  } catch (e) {}
 
   return runtimeProducts.filter(p => !p.branchId || !branchId || p.branchId === branchId)
 }
@@ -231,7 +338,7 @@ export async function recordTransaction(payload: {
   vehiclePhotoUrl?: string | null
   usedBottlePhotoUrl?: string | null
 }): Promise<InterlockingTransaction> {
-  const branch = DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES[0]
+  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
   // Deduct retail stock
   for (const item of payload.items) {
@@ -276,7 +383,6 @@ export async function recordTransaction(payload: {
 
   runtimeTransactions.unshift(tx)
 
-  // Try writing to Supabase
   try {
     await supabase.from("transactions").insert({
       id: tx.id,
@@ -313,7 +419,7 @@ export async function recordFraudAlert(payload: {
   alertType: "UNAUTHORIZED_FLOW" | "TAMPER_DETECTED" | "DISCREPANCY"
   message: string
 }): Promise<FraudAlert> {
-  const branch = DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES[0]
+  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
   const alert: FraudAlert = {
     id: `ALERT-${Date.now()}`,
@@ -348,9 +454,8 @@ export async function recordShiftClosing(payload: {
   physicalCash: number
   notes?: string
 }): Promise<ShiftClosing> {
-  const branch = DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES[0]
+  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
-  // Calculate today's system cash transactions for this branch
   const branchTxs = runtimeTransactions.filter(t => 
     t.branchId === payload.branchId &&
     t.paymentMethod === "CASH" &&

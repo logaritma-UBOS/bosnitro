@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useBranch } from "@/context/BranchContext"
 import { InterlockingTransaction, FraudAlert } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
@@ -26,14 +26,28 @@ import {
 export default function OwnerDashboardInterlockingClient({
   initialTransactions,
   initialAlerts,
+  initialTelegramPhone,
 }: {
   initialTransactions: InterlockingTransaction[]
   initialAlerts: FraudAlert[]
+  initialTelegramPhone?: string
 }) {
-  const { selectedBranch, selectedBranchId, isAllBranches } = useBranch()
+  const { branches, selectedBranch, selectedBranchId, isAllBranches } = useBranch()
   const [transactions] = useState<InterlockingTransaction[]>(initialTransactions)
   const [alerts] = useState<FraudAlert[]>(initialAlerts)
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
+
+  // Dynamic Telegram phone number from user account & store settings
+  const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "083153598697")
+
+  useEffect(() => {
+    fetch("/api/settings/store")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.telegramPhone) setTelegramPhone(data.telegramPhone)
+      })
+      .catch(() => {})
+  }, [])
 
   // Telegram report state
   const [sendingTelegram, setSendingTelegram] = useState(false)
@@ -50,12 +64,12 @@ export default function OwnerDashboardInterlockingClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           branchId: selectedBranchId,
-          recipient: "083153598697",
+          recipient: telegramPhone,
         }),
       })
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Gagal memproses pengiriman")
-      setTelegramStatus(data.message || "Laporan transaksi harian berhasil disiapkan untuk Telegram (083153598697).")
+      setTelegramStatus(data.message || `Laporan transaksi harian berhasil disiapkan untuk Telegram (${telegramPhone}).`)
       if (data.shareUrl) setTelegramShareUrl(data.shareUrl)
     } catch (err: any) {
       alert("Error: " + err.message)
@@ -86,7 +100,7 @@ export default function OwnerDashboardInterlockingClient({
 
   const validTxCount = filteredTransactions.length
 
-  const branchLabel = isAllBranches ? "Seluruh 4 Cabang" : selectedBranch.name
+  const branchLabel = isAllBranches ? `Seluruh ${branches.length} Cabang` : selectedBranch.name
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 font-sans">
@@ -114,7 +128,7 @@ export default function OwnerDashboardInterlockingClient({
             className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
-            <span>{sendingTelegram ? "Mengirim Laporan..." : "Kirim Laporan ke Telegram (083153598697)"}</span>
+            <span>{sendingTelegram ? "Mengirim Laporan..." : `Kirim Laporan ke Telegram (${telegramPhone})`}</span>
           </button>
           <div className="w-full sm:w-64">
             <BranchSelector allowAll={true} />
@@ -168,7 +182,7 @@ export default function OwnerDashboardInterlockingClient({
           </div>
         </div>
 
-        {/* Card 2: Laba Kotor (Gross Profit) */}
+        {/* Card 2: Laba Kotor */}
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400 mb-3">
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
@@ -179,10 +193,10 @@ export default function OwnerDashboardInterlockingClient({
             </div>
           </div>
           <div>
-            <p className="text-2xl font-black text-blue-900 tabular-nums">
+            <p className="text-2xl font-black text-slate-900 tabular-nums">
               {formatRupiah(totalGrossProfit)}
             </p>
-            <p className="text-[11px] text-blue-600 font-bold mt-1">
+            <p className="text-[11px] text-slate-400 font-medium mt-1">
               Margin Rata-rata: {totalRevenue > 0 ? Math.round((totalGrossProfit / totalRevenue) * 100) : 0}%
             </p>
           </div>
@@ -225,7 +239,7 @@ export default function OwnerDashboardInterlockingClient({
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
               </span>
               <p className="text-lg font-black text-emerald-800">
-                {isAllBranches ? "4 / 4 Online" : "Online (Normal)"}
+                {isAllBranches ? `${branches.length} / ${branches.length} Online` : "Online (Normal)"}
               </p>
             </div>
             <p className="text-[11px] text-slate-400 font-medium mt-1">

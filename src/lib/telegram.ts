@@ -1,8 +1,20 @@
 import { DEFAULT_BRANCHES, InterlockingTransaction, ShiftClosing, FraudAlert } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
-import { getTransactions, getShiftClosings, getFraudAlerts } from "@/lib/interlockingDb"
+import { getTransactions, getShiftClosings, getFraudAlerts, getBranches } from "@/lib/interlockingDb"
 
 export const DEFAULT_TELEGRAM_RECIPIENT = "083153598697"
+
+let activeTelegramRecipient = DEFAULT_TELEGRAM_RECIPIENT
+
+export function getActiveTelegramRecipient(): string {
+  return activeTelegramRecipient
+}
+
+export function setActiveTelegramRecipient(phone: string) {
+  if (phone && phone.trim()) {
+    activeTelegramRecipient = phone.trim()
+  }
+}
 
 /**
  * Telegram Notification Helper for IoT Fraud & Anomaly Alerts
@@ -12,7 +24,7 @@ export async function sendTelegramAlert(message: string): Promise<boolean> {
   const chatId = process.env.TELEGRAM_CHAT_ID
 
   if (!botToken || !chatId) {
-    console.log(`[Telegram Alert Fallback -> Target: ${DEFAULT_TELEGRAM_RECIPIENT}]:\n`, message)
+    console.log(`[Telegram Alert Fallback -> Target: ${activeTelegramRecipient}]:\n`, message)
     return false
   }
 
@@ -37,17 +49,19 @@ export async function sendTelegramAlert(message: string): Promise<boolean> {
 /**
  * Generate formatted Daily Transaction & Anti-Loss Report text for a branch or all branches
  */
-export async function generateDailyBranchReportText(branchId?: string): Promise<{
+export async function generateDailyBranchReportText(branchId?: string, recipientPhone?: string): Promise<{
   reportText: string
   branchName: string
   totalRevenue: number
   txCount: number
 }> {
+  const branches = await getBranches()
   const targetBranch = branchId && branchId !== "ALL" 
-    ? DEFAULT_BRANCHES.find(b => b.id === branchId) 
+    ? branches.find(b => b.id === branchId) || DEFAULT_BRANCHES.find(b => b.id === branchId)
     : null
 
-  const branchName = targetBranch ? targetBranch.name : "Konsolidasi Seluruh Cabang (4 Outlet)"
+  const branchName = targetBranch ? targetBranch.name : `Konsolidasi Seluruh Cabang (${branches.length} Outlet)`
+  const targetPhone = recipientPhone || activeTelegramRecipient
 
   const [allTx, allClosings, allAlerts] = await Promise.all([
     getTransactions(branchId && branchId !== "ALL" ? branchId : undefined),
@@ -106,7 +120,7 @@ export async function generateDailyBranchReportText(branchId?: string): Promise<
 
 <b>Cabang:</b> ${branchName}
 <b>Waktu Cetak:</b> ${dateStr} WIB
-<b>Target WhatsApp/Telegram:</b> ${DEFAULT_TELEGRAM_RECIPIENT}
+<b>Target WhatsApp/Telegram:</b> ${targetPhone}
 
 <b>RINGKASAN FINANSIAL:</b>
 • Total Omzet: <b>${formatRupiah(totalRevenue)}</b>
@@ -148,13 +162,14 @@ ${allAlerts.length > 0 ? allAlerts.map(a => `  ⚠️ [${a.branchName}] ${a.mess
 /**
  * Dispatch Daily Branch Report to Telegram Bot
  */
-export async function sendDailyBranchReportTelegram(branchId?: string, targetRecipient: string = DEFAULT_TELEGRAM_RECIPIENT): Promise<{
+export async function sendDailyBranchReportTelegram(branchId?: string, targetRecipient?: string): Promise<{
   success: boolean
   message: string
   reportText: string
   shareUrl: string
 }> {
-  const { reportText, branchName } = await generateDailyBranchReportText(branchId)
+  const recipient = targetRecipient || activeTelegramRecipient
+  const { reportText, branchName } = await generateDailyBranchReportText(branchId, recipient)
 
   // Direct share link to Telegram
   const cleanTextForUrl = reportText
@@ -167,10 +182,10 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
   const chatId = process.env.TELEGRAM_CHAT_ID
 
   if (!botToken || !chatId) {
-    console.log(`[Telegram Bot Report to ${targetRecipient}] (Bot token/chatId belum diset di .env):\n${cleanTextForUrl}`)
+    console.log(`[Telegram Bot Report to ${recipient}] (Bot token/chatId belum diset di .env):\n${cleanTextForUrl}`)
     return {
       success: true,
-      message: `Laporan cabang "${branchName}" berhasil dibuat untuk nomor ${targetRecipient}. Link Telegram siap digunakan.`,
+      message: `Laporan cabang "${branchName}" berhasil dibuat untuk nomor ${recipient}. Link Telegram siap digunakan.`,
       reportText,
       shareUrl,
     }
@@ -190,7 +205,7 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
     if (res.ok) {
       return {
         success: true,
-        message: `Laporan cabang "${branchName}" berhasil dikirim langsung ke Telegram bot penerima ${targetRecipient}.`,
+        message: `Laporan cabang "${branchName}" berhasil dikirim langsung ke Telegram bot penerima ${recipient}.`,
         reportText,
         shareUrl,
       }
@@ -199,7 +214,7 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
       console.warn("[Telegram Bot API Response Warning]:", errJson)
       return {
         success: true,
-        message: `Laporan cabang "${branchName}" siap dikirim via link Telegram langsung ke nomor ${targetRecipient}.`,
+        message: `Laporan cabang "${branchName}" siap dikirim via link Telegram langsung ke nomor ${recipient}.`,
         reportText,
         shareUrl,
       }
@@ -208,7 +223,7 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
     console.error("[Telegram Bot API Send Error]:", error)
     return {
       success: true,
-      message: `Laporan cabang "${branchName}" siap dikirim via link Telegram.`,
+      message: `Laporan cabang "${branchName}" siap dikirim via link Telegram ke ${recipient}.`,
       reportText,
       shareUrl,
     }

@@ -18,6 +18,7 @@ import {
   MessageSquare,
   LogOut,
   X,
+  Store,
 } from "lucide-react"
 
 export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
@@ -45,6 +46,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
         { label: "Tutup Shift", href: "/shift-closing", icon: Lock },
         { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign },
         { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users },
+        { label: "Pengaturan Toko", href: "/pengaturan/toko", icon: Store },
       ],
     },
     {
@@ -75,6 +77,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
       "/pengaturan/target",
       "/pengaturan/whatsapp",
       "/pengaturan/pegawai",
+      "/pengaturan/toko",
     ]
     menuCategories = menuCategories
       .map((cat) => ({
@@ -86,7 +89,8 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
 
   return (
     <>
-      <div className="lg:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200/80 flex justify-around items-center h-[72px] z-[60] shadow-[0_-8px_30px_rgba(0,0,0,0.06)] pb-safe rounded-t-2xl px-2">
+      {/* BOTTOM NAV BAR */}
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-md border-t border-gray-200 z-50 flex items-center justify-around px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] lg:hidden">
         {/* BERANDA (OWNER ONLY) */}
         {role === "OWNER" && (
           <Link href="/beranda" className={navItemClass("/beranda")}>
@@ -168,25 +172,21 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
             <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-safe space-y-5">
               {menuCategories.map((category, catIdx) => (
                 <div key={catIdx}>
-                  <h3 className="text-[10px] font-bold text-gray-400 mb-2.5 ml-1 tracking-wider uppercase">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-2">
                     {category.title}
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {category.links.map((link, i) => {
-                      const IconComp = link.icon
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {category.links.map((link, linkIdx) => {
+                      const Icon = link.icon
                       return (
                         <Link
-                          key={i}
+                          key={linkIdx}
                           href={link.href}
                           onClick={() => setIsMoreOpen(false)}
-                          className="flex flex-col items-center justify-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 shadow-xs active:scale-95 transition-all text-center"
+                          className="flex items-center gap-2.5 p-3 rounded-2xl bg-white border border-gray-100 hover:border-emerald-300 hover:bg-emerald-50/30 text-gray-700 text-xs font-semibold shadow-xs transition-colors"
                         >
-                          <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-700">
-                            <IconComp className="w-5 h-5 text-emerald-600" />
-                          </div>
-                          <span className="text-[11px] font-bold text-gray-700 leading-tight">
-                            {link.label}
-                          </span>
+                          <Icon className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="truncate">{link.label}</span>
                         </Link>
                       )
                     })}
@@ -194,38 +194,34 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                 </div>
               ))}
 
-              <div>
-                <h3 className="text-[10px] font-bold text-gray-400 mb-2.5 ml-1 tracking-wider uppercase">
-                  BANTUAN
-                </h3>
-                <div className="grid grid-cols-3 gap-2.5">
-                  <button
-                    onClick={() => {
-                      setIsMoreOpen(false)
-                      setTimeout(() => window.dispatchEvent(new Event("open-live-chat")), 300)
-                    }}
-                    className="flex flex-col items-center justify-center gap-2 p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-xs text-center transition-all"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                      <MessageSquare className="w-5 h-5" />
-                    </div>
-                    <span className="text-[11px] font-bold text-gray-700 leading-tight">Support</span>
-                  </button>
+              {/* INTEGRASI TAMBAHAN (OWNER ONLY) */}
+              {role === "OWNER" && (
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-2">
+                    INTEGRASI & SISTEM
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link
+                      href="/pengaturan/whatsapp"
+                      onClick={() => setIsMoreOpen(false)}
+                      className="flex items-center gap-2.5 p-3 rounded-2xl bg-white border border-gray-100 hover:border-emerald-300 text-gray-700 text-xs font-semibold shadow-xs"
+                    >
+                      <MessageSquare className="w-4 h-4 text-emerald-600" />
+                      <span>WhatsApp Blast</span>
+                    </Link>
+                  </div>
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    const { signOut } = require("next-auth/react")
-                    signOut({ callbackUrl: "/login" })
-                  }}
-                  className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition-colors text-sm"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Keluar ({role})
-                </button>
-              </div>
+            <div className="p-4 border-t border-gray-100 bg-white">
+              <Link
+                href="/login"
+                className="flex items-center justify-center gap-2 w-full p-3 rounded-2xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Keluar dari Aplikasi</span>
+              </Link>
             </div>
           </div>
         </div>
