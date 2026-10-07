@@ -11,7 +11,7 @@ export default async function PegawaiPage() {
 
   // Hanya owner yang boleh akses halaman pengaturan pegawai
   if (session.user.role !== "OWNER") {
-    redirect("/beranda")
+    redirect("/kasir")
   }
 
   return (

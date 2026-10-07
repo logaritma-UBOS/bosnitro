@@ -58,8 +58,10 @@ export default function PegawaiClient() {
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Manajemen Pegawai</h1>
-          <p className="text-slate-500 text-sm mt-1">Buat akun untuk kasir atau manajer toko Anda</p>
+          <h1 className="text-2xl font-bold text-slate-800">Manajemen Pegawai & Hak Akses</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Buat akun kasir atau manajer dengan pembatasan hak akses sistem interlocking & POS
+          </p>
         </div>
         <button 
           onClick={() => setShowModal(true)}
@@ -69,6 +71,29 @@ export default function PegawaiClient() {
         </button>
       </div>
 
+      {/* Role explanation cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+            <h3 className="font-bold text-orange-900 text-sm">Hak Akses: KASIR</h3>
+          </div>
+          <p className="text-xs text-orange-800 mt-1">
+            Hanya dapat mengakses transaksi <b>Kasir POS</b> (foto plat/botol & pemicu solenoid) dan melakukan <b>Tutup Shift (Blind Closing)</b>. Katalog, laporan finansial, dan dashboard Owner terkunci rapat.
+          </p>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            <h3 className="font-bold text-blue-900 text-sm">Hak Akses: MANAGER</h3>
+          </div>
+          <p className="text-xs text-blue-800 mt-1">
+            Dapat mengakses <b>Kasir POS</b>, <b>Katalog & Timer</b> (atur harga, stok, timer solenoid), <b>Tutup Shift</b> (termasuk audit selisih), dan <b>Riwayat Transaksi</b>. Laporan finansial Owner tetap terkunci.
+          </p>
+        </div>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
         {staffs.length === 0 ? (
           <div className="p-12 text-center text-slate-500">Belum ada pegawai yang didaftarkan.</div>
@@ -76,7 +101,7 @@ export default function PegawaiClient() {
           <table className="w-full text-left text-sm text-slate-600 min-w-[600px]">
             <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4">Nama</th>
+                <th className="px-6 py-4">Nama Pegawai</th>
                 <th className="px-6 py-4">Email Login</th>
                 <th className="px-6 py-4">Jabatan (Role)</th>
                 <th className="px-6 py-4 text-right">Aksi</th>
@@ -131,8 +156,8 @@ export default function PegawaiClient() {
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Pilih Jabatan (Role)</label>
                   <select name="role" required className="w-full border-slate-200 rounded-xl focus:ring-emerald-500 focus:border-emerald-500">
-                    <option value="KASIR">Kasir (Hanya akses transaksi POS)</option>
-                    <option value="MANAGER">Manager (Akses POS, Stok, dan Katalog)</option>
+                    <option value="KASIR">Kasir (Hanya akses transaksi POS & Tutup Shift)</option>
+                    <option value="MANAGER">Manager (Akses POS, Katalog & Stok, Tutup Shift, & Riwayat)</option>
                   </select>
                 </div>
               </div>

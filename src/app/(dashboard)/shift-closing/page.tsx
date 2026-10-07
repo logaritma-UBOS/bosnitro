@@ -1,19 +1,20 @@
 export const dynamic = "force-dynamic"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
-import { getProducts } from "@/lib/interlockingDb"
-import KasirInterlockingClient from "./KasirInterlockingClient"
+import { getShiftClosings } from "@/lib/interlockingDb"
+import ShiftClosingClient from "./ShiftClosingClient"
 
-export default async function KasirPage() {
+export default async function ShiftClosingPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/login")
 
-  const products = await getProducts()
+  const closings = await getShiftClosings()
 
   return (
-    <KasirInterlockingClient
-      initialProducts={products}
+    <ShiftClosingClient
+      initialClosings={closings}
       user={{
+        id: session.user.id,
         name: session.user.name,
         role: session.user.role,
       }}
