@@ -7,6 +7,27 @@ import { formatRupiah } from "@/lib/format"
 import BranchSelector from "@/components/branch/BranchSelector"
 import AuditCameraModal from "@/components/pos/AuditCameraModal"
 import SolenoidCountdownModal from "@/components/pos/SolenoidCountdownModal"
+import {
+  Zap,
+  Gauge,
+  Droplets,
+  Bike,
+  Car,
+  Clock,
+  Search,
+  X,
+  ShoppingCart,
+  Camera,
+  Check,
+  ArrowRight,
+  Banknote,
+  QrCode,
+  CreditCard,
+  Plus,
+  Minus,
+  Radio,
+  Package,
+} from "lucide-react"
 
 type CartItem = {
   product: InterlockingProduct
@@ -247,7 +268,7 @@ export default function KasirInterlockingClient({
       <header className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-emerald-600/20">
-            ⚡
+            <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-base font-extrabold text-slate-900 leading-tight">
@@ -280,7 +301,7 @@ export default function KasirInterlockingClient({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <span className="text-sm">💨</span>
+              <Gauge className="w-4 h-4 text-emerald-600" />
               <span>Layanan Nitrogen</span>
               <span className="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
                 IoT Valve
@@ -295,7 +316,7 @@ export default function KasirInterlockingClient({
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <span className="text-sm">🧴</span>
+              <Droplets className="w-4 h-4 text-blue-600" />
               <span>Ritel & Oli</span>
               <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
                 Stok Fisik
@@ -316,9 +337,9 @@ export default function KasirInterlockingClient({
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
-                    Sensor Aktif
+                  <span className="inline-flex items-center gap-1.5 bg-emerald-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    <Radio className="w-3 h-3 animate-pulse" />
+                    <span>Sensor Aktif</span>
                   </span>
                 </div>
               </div>
@@ -335,11 +356,12 @@ export default function KasirInterlockingClient({
                     >
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-2xl p-2.5 bg-slate-50 group-hover:bg-emerald-100 rounded-2xl transition-colors">
-                            {isMotor ? "🏍️" : "🚗"}
-                          </span>
+                          <div className="p-2.5 bg-slate-50 group-hover:bg-emerald-100 text-emerald-700 rounded-2xl transition-colors">
+                            {isMotor ? <Bike className="w-5 h-5" /> : <Car className="w-5 h-5" />}
+                          </div>
                           <span className="bg-slate-100 group-hover:bg-emerald-100 text-slate-700 group-hover:text-emerald-800 text-xs font-extrabold px-3 py-1 rounded-full flex items-center gap-1">
-                            ⏱️ {p.timerSeconds} Detik
+                            <Clock className="w-3 h-3 text-emerald-600" />
+                            <span>{p.timerSeconds} Detik</span>
                           </span>
                         </div>
                         <h4 className="text-base font-extrabold text-slate-900 group-hover:text-emerald-900 transition-colors">
@@ -354,8 +376,9 @@ export default function KasirInterlockingClient({
                         <span className="text-lg font-black text-emerald-700 tabular-nums">
                           {formatRupiah(p.price)}
                         </span>
-                        <span className="bg-emerald-600 group-hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3.5 rounded-xl shadow-xs transition-colors">
-                          + Pilih
+                        <span className="bg-emerald-600 group-hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3.5 rounded-xl shadow-xs transition-colors flex items-center gap-1">
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Pilih</span>
                         </span>
                       </div>
                     </div>
@@ -377,16 +400,14 @@ export default function KasirInterlockingClient({
                   placeholder="Scan Barcode atau ketik nama oli / barang..."
                   className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 shadow-xs"
                 />
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-base">
-                  🔍
-                </span>
+                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                   >
-                    ✕
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -407,7 +428,9 @@ export default function KasirInterlockingClient({
                     >
                       <div>
                         <div className="flex justify-between items-start gap-2 mb-2">
-                          <span className="text-xl">🧴</span>
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Droplets className="w-4 h-4" />
+                          </div>
                           <span
                             className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                               p.stock > 10
@@ -432,8 +455,9 @@ export default function KasirInterlockingClient({
                         <span className="text-sm font-black text-slate-900 tabular-nums">
                           {formatRupiah(p.price)}
                         </span>
-                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">
-                          + Tambah
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                          <Plus className="w-3 h-3" />
+                          <span>Tambah</span>
                         </span>
                       </div>
                     </div>
@@ -469,7 +493,7 @@ export default function KasirInterlockingClient({
           <div className="flex-1 p-4 overflow-y-auto space-y-2.5 divide-y divide-slate-100">
             {cart.length === 0 ? (
               <div className="py-16 text-center text-slate-400">
-                <span className="text-3xl block mb-2">🛒</span>
+                <ShoppingCart className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                 <p className="text-xs font-medium">Keranjang masih kosong.</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Pilih layanan nitrogen atau barang ritel di sebelah kiri.
@@ -490,7 +514,7 @@ export default function KasirInterlockingClient({
                       onClick={() => updateQuantity(item.product.id, -1)}
                       className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-sm flex items-center justify-center"
                     >
-                      -
+                      <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-xs font-bold text-slate-800 w-5 text-center tabular-nums">
                       {item.quantity}
@@ -500,7 +524,7 @@ export default function KasirInterlockingClient({
                       onClick={() => updateQuantity(item.product.id, 1)}
                       className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-sm flex items-center justify-center"
                     >
-                      +
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -518,20 +542,22 @@ export default function KasirInterlockingClient({
               {hasNitrogenInCart && (
                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-2.5 text-xs">
                   <div className="flex items-center gap-2">
-                    <span>🏍️</span>
+                    <Bike className="w-4 h-4 text-emerald-600" />
                     <span className="font-bold text-slate-800">Foto Plat Kendaraan</span>
                   </div>
                   {vehiclePhotoUrl ? (
                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      ✓ Terlampir
+                      <Check className="w-3 h-3 stroke-[3]" />
+                      <span>Terlampir</span>
                     </span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setCameraModalType("NITROGEN_PLATE")}
-                      className="text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded-md"
+                      className="text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded-md flex items-center gap-1"
                     >
-                      📸 Ambil Foto
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Ambil Foto</span>
                     </button>
                   )}
                 </div>
@@ -540,20 +566,22 @@ export default function KasirInterlockingClient({
               {hasRetailInCart && (
                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-2.5 text-xs">
                   <div className="flex items-center gap-2">
-                    <span>🧴</span>
+                    <Droplets className="w-4 h-4 text-blue-600" />
                     <span className="font-bold text-slate-800">Foto Botol Bekas Oli</span>
                   </div>
                   {usedBottlePhotoUrl ? (
                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      ✓ Terlampir
+                      <Check className="w-3 h-3 stroke-[3]" />
+                      <span>Terlampir</span>
                     </span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setCameraModalType("RETAIL_BOTTLE")}
-                      className="text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded-md"
+                      className="text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded-md flex items-center gap-1"
                     >
-                      📸 Ambil Foto
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Ambil Foto</span>
                     </button>
                   )}
                 </div>
@@ -570,20 +598,24 @@ export default function KasirInterlockingClient({
                   Metode Pembayaran
                 </label>
                 <div className="grid grid-cols-3 gap-1.5">
-                  {(["CASH", "QRIS", "TRANSFER"] as const).map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPaymentMethod(method)}
-                      className={`py-2 rounded-xl text-xs font-bold transition-all ${
-                        paymentMethod === method
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      {method}
-                    </button>
-                  ))}
+                  {(["CASH", "QRIS", "TRANSFER"] as const).map((method) => {
+                    const MethodIcon = method === "CASH" ? Banknote : method === "QRIS" ? QrCode : CreditCard
+                    return (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setPaymentMethod(method)}
+                        className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          paymentMethod === method
+                            ? "bg-slate-900 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        <MethodIcon className="w-3.5 h-3.5" />
+                        <span>{method}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -661,7 +693,7 @@ export default function KasirInterlockingClient({
                     <span>
                       {hasNitrogenInCart ? "Konfirmasi & Buka Katup Gas" : "Selesaikan Pembayaran"}
                     </span>
-                    <span>→</span>
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>

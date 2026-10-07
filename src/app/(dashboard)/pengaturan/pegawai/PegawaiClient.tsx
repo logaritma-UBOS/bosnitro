@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getStaffList, createStaff, deleteStaff } from "@/actions/staff"
-import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline"
+import { Plus, Trash2, Users, ShieldCheck, UserCheck, X } from "lucide-react"
 
 export default function PegawaiClient() {
   const [staffs, setStaffs] = useState<any[]>([])
@@ -58,8 +58,13 @@ export default function PegawaiClient() {
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Manajemen Pegawai & Hak Akses</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800">Manajemen Pegawai & Hak Akses</h1>
+          </div>
+          <p className="text-slate-500 text-sm">
             Buat akun kasir atau manajer dengan pembatasan hak akses sistem interlocking & POS
           </p>
         </div>
@@ -67,7 +72,7 @@ export default function PegawaiClient() {
           onClick={() => setShowModal(true)}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 w-full sm:w-auto shadow-sm"
         >
-          <PlusIcon className="w-5 h-5" /> Tambah Pegawai
+          <Plus className="w-4 h-4" /> Tambah Pegawai
         </button>
       </div>
 
@@ -75,7 +80,7 @@ export default function PegawaiClient() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+            <UserCheck className="w-4 h-4 text-orange-600" />
             <h3 className="font-bold text-orange-900 text-sm">Hak Akses: KASIR</h3>
           </div>
           <p className="text-xs text-orange-800 mt-1">
@@ -85,7 +90,7 @@ export default function PegawaiClient() {
 
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            <ShieldCheck className="w-4 h-4 text-blue-600" />
             <h3 className="font-bold text-blue-900 text-sm">Hak Akses: MANAGER</h3>
           </div>
           <p className="text-xs text-blue-800 mt-1">
@@ -119,7 +124,7 @@ export default function PegawaiClient() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => handleDelete(staff.id)} className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50">
-                      <TrashIcon className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
@@ -134,7 +139,9 @@ export default function PegawaiClient() {
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="font-bold text-slate-800 text-lg">Tambah Pegawai Baru</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6">
               {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl">{error}</div>}

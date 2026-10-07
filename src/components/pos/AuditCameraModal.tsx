@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { Camera, UploadCloud, X, Check, RotateCcw, ShieldCheck, AlertCircle } from "lucide-react"
 
 type AuditCameraModalProps = {
   isOpen: boolean
@@ -26,13 +27,13 @@ export default function AuditCameraModal({
 
   const title =
     auditType === "NITROGEN_PLATE"
-      ? "📸 Audit Interlocking: Foto Plat Nomor Kendaraan"
-      : "🧴 Audit Visual: Foto Botol Bekas Oli"
+      ? "Audit Interlocking: Foto Plat Nomor Kendaraan"
+      : "Audit Visual: Foto Botol Bekas Oli"
 
   const description =
     auditType === "NITROGEN_PLATE"
-      ? "Wajib memotret plat nomor motor / mobil pelanggan. Katup pengisian solenoid nitrogen HANYA akan terbuka otomatis setelah foto terverifikasi."
-      : "Wajib memotret botol oli bekas yang diganti untuk memastikan barang keluar fisik sesuai nota transaksi."
+      ? "Wajib memotret plat nomor motor / mobil pelanggan. Katup solenoid nitrogen HANYA akan terbuka setelah foto terverifikasi."
+      : "Wajib memotret botol oli bekas yang diganti untuk memastikan pengeluaran stok fisik sesuai nota transaksi."
 
   useEffect(() => {
     let activeStream: MediaStream | null = null
@@ -53,7 +54,7 @@ export default function AuditCameraModal({
         }
       } catch (err: any) {
         console.warn("Camera access warning:", err)
-        setCameraError("Kamera otomatis tidak dapat diakses. Silakan gunakan tombol 'Ambil dari Kamera HP / File' di bawah.")
+        setCameraError("Kamera otomatis tidak dapat diakses. Silakan gunakan tombol 'Upload / Kamera HP' di bawah.")
       }
     }
 
@@ -115,7 +116,6 @@ export default function AuditCameraModal({
     setIsUploading(true)
 
     try {
-      // Convert data URL to Blob/File to upload
       const res = await fetch(capturedImage)
       const blob = await res.blob()
       const file = new File([blob], `audit_${auditType.toLowerCase()}_${Date.now()}.jpg`, {
@@ -148,9 +148,14 @@ export default function AuditCameraModal({
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-4 bg-emerald-50 border-b border-emerald-100 flex items-start justify-between">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 leading-snug">{title}</h3>
-            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{description}</p>
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-600/10 border border-emerald-600/20 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+              <Camera className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 leading-snug">{title}</h3>
+              <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{description}</p>
+            </div>
           </div>
           <button
             type="button"
@@ -158,7 +163,7 @@ export default function AuditCameraModal({
             disabled={isUploading}
             className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -170,15 +175,16 @@ export default function AuditCameraModal({
             <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black flex items-center justify-center border-2 border-emerald-500 shadow-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={capturedImage} alt="Captured Audit" className="w-full h-full object-contain" />
-              <div className="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full tracking-wider shadow">
-                ✓ Foto Berhasil Ditangkap
+              <div className="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-full tracking-wider shadow flex items-center gap-1.5">
+                <Check className="w-3 h-3 stroke-[3]" />
+                <span>Foto Berhasil Ditangkap</span>
               </div>
             </div>
           ) : (
             <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-slate-700">
               {cameraError ? (
                 <div className="p-6 text-center text-slate-300">
-                  <span className="text-4xl block mb-2">📷</span>
+                  <AlertCircle className="w-10 h-10 mx-auto text-amber-400 mb-2" />
                   <p className="text-xs text-amber-300 font-semibold">{cameraError}</p>
                 </div>
               ) : (
@@ -193,8 +199,9 @@ export default function AuditCameraModal({
 
               {/* Viewfinder Target Overlay */}
               <div className="absolute inset-4 border-2 border-dashed border-white/50 rounded-xl pointer-events-none flex items-center justify-center">
-                <span className="text-[11px] font-bold text-white/80 bg-black/50 px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-xs">
-                  {auditType === "NITROGEN_PLATE" ? "Posisikan Plat Nomor di Kotak Ini" : "Posisikan Botol Oli Bekas"}
+                <span className="text-[11px] font-bold text-white/90 bg-black/60 px-3 py-1.5 rounded-full uppercase tracking-wider backdrop-blur-xs flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{auditType === "NITROGEN_PLATE" ? "Posisikan Plat Nomor di Kotak Ini" : "Posisikan Botol Oli Bekas"}</span>
                 </span>
               </div>
             </div>
@@ -219,9 +226,10 @@ export default function AuditCameraModal({
                 type="button"
                 onClick={handleRetake}
                 disabled={isUploading}
-                className="w-full sm:w-1/3 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors"
+                className="w-full sm:w-1/3 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
               >
-                Ulangi Foto
+                <RotateCcw className="w-4 h-4" />
+                <span>Ulangi Foto</span>
               </button>
               <button
                 type="button"
@@ -234,7 +242,7 @@ export default function AuditCameraModal({
                 ) : (
                   <>
                     <span>Gunakan Foto & Lanjutkan Transaksi</span>
-                    <span>✓</span>
+                    <Check className="w-4 h-4" />
                   </>
                 )}
               </button>
@@ -246,7 +254,8 @@ export default function AuditCameraModal({
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full sm:w-1/2 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 flex items-center justify-center gap-2"
               >
-                <span>📁 Upload / Kamera HP</span>
+                <UploadCloud className="w-4 h-4 text-slate-500" />
+                <span>Upload / Kamera HP</span>
               </button>
               <button
                 type="button"
@@ -254,7 +263,8 @@ export default function AuditCameraModal({
                 disabled={Boolean(cameraError)}
                 className="w-full sm:w-1/2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all"
               >
-                <span>📸 Tangkap Foto Sekarang</span>
+                <Camera className="w-4 h-4" />
+                <span>Tangkap Foto Sekarang</span>
               </button>
             </>
           )}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { recordShiftClosing, getShiftClosings } from "@/lib/interlockingDb"
+import { sendDailyBranchReportTelegram } from "@/lib/telegram"
 import { auth } from "@/auth"
 
 export async function POST(req: NextRequest) {
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
       physicalCash: Number(physicalCash),
       notes
     })
+
+    // Auto-trigger Telegram report for this branch
+    sendDailyBranchReportTelegram(branchId).catch(console.error)
 
     return NextResponse.json({ success: true, closing })
   } catch (error: any) {

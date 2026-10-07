@@ -2,10 +2,26 @@
 
 import { useState, useMemo } from "react"
 import { useBranch } from "@/context/BranchContext"
-import { InterlockingTransaction, FraudAlert, DEFAULT_BRANCHES } from "@/types/branch"
+import { InterlockingTransaction, FraudAlert } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
 import BranchSelector from "@/components/branch/BranchSelector"
 import Link from "next/link"
+import {
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  ShieldCheck,
+  Cpu,
+  AlertTriangle,
+  AlertCircle,
+  Camera,
+  Lock,
+  Send,
+  ExternalLink,
+  CheckCircle2,
+  ArrowRight,
+  X,
+} from "lucide-react"
 
 export default function OwnerDashboardInterlockingClient({
   initialTransactions,
@@ -16,8 +32,37 @@ export default function OwnerDashboardInterlockingClient({
 }) {
   const { selectedBranch, selectedBranchId, isAllBranches } = useBranch()
   const [transactions] = useState<InterlockingTransaction[]>(initialTransactions)
-  const [alerts, setAlerts] = useState<FraudAlert[]>(initialAlerts)
+  const [alerts] = useState<FraudAlert[]>(initialAlerts)
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
+
+  // Telegram report state
+  const [sendingTelegram, setSendingTelegram] = useState(false)
+  const [telegramStatus, setTelegramStatus] = useState<string | null>(null)
+  const [telegramShareUrl, setTelegramShareUrl] = useState<string | null>(null)
+
+  const handleSendTelegramReport = async () => {
+    setSendingTelegram(true)
+    setTelegramStatus(null)
+    setTelegramShareUrl(null)
+    try {
+      const res = await fetch("/api/telegram/daily-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          branchId: selectedBranchId,
+          recipient: "083153598697",
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || "Gagal memproses pengiriman")
+      setTelegramStatus(data.message || "Laporan transaksi harian berhasil disiapkan untuk Telegram (083153598697).")
+      if (data.shareUrl) setTelegramShareUrl(data.shareUrl)
+    } catch (err: any) {
+      alert("Error: " + err.message)
+    } finally {
+      setSendingTelegram(false)
+    }
+  }
 
   // Filter based on active branch selector
   const filteredTransactions = useMemo(() => {
@@ -48,8 +93,10 @@ export default function OwnerDashboardInterlockingClient({
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">📊</span>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <BarChart3 className="w-5 h-5" />
+            </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
               Dashboard Anti-Loss & Pengawasan Multi-Cabang
             </h1>
@@ -59,10 +106,45 @@ export default function OwnerDashboardInterlockingClient({
           </p>
         </div>
 
-        <div className="w-full md:w-72">
-          <BranchSelector allowAll={true} />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSendTelegramReport}
+            disabled={sendingTelegram}
+            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" />
+            <span>{sendingTelegram ? "Mengirim Laporan..." : "Kirim Laporan ke Telegram (083153598697)"}</span>
+          </button>
+          <div className="w-full sm:w-64">
+            <BranchSelector allowAll={true} />
+          </div>
         </div>
       </div>
+
+      {/* Telegram Report Status Banner */}
+      {telegramStatus && (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-bold text-sky-950">Laporan Transaksi Harian Siap</h4>
+              <p className="text-xs text-sky-800 mt-0.5">{telegramStatus}</p>
+            </div>
+          </div>
+          {telegramShareUrl && (
+            <a
+              href={telegramShareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors shrink-0"
+            >
+              <span>Buka di Telegram</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -72,7 +154,9 @@ export default function OwnerDashboardInterlockingClient({
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
               Total Omzet ({branchLabel})
             </span>
-            <span className="text-xl p-2 bg-emerald-50 rounded-xl">💰</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
+            </div>
           </div>
           <div>
             <p className="text-2xl font-black text-slate-900 tabular-nums">
@@ -90,7 +174,9 @@ export default function OwnerDashboardInterlockingClient({
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
               Laba Kotor (Gross Profit)
             </span>
-            <span className="text-xl p-2 bg-blue-50 rounded-xl">📈</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <DollarSign className="w-4 h-4" />
+            </div>
           </div>
           <div>
             <p className="text-2xl font-black text-blue-900 tabular-nums">
@@ -108,7 +194,9 @@ export default function OwnerDashboardInterlockingClient({
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
               Transaksi Terverifikasi
             </span>
-            <span className="text-xl p-2 bg-purple-50 rounded-xl">🛡️</span>
+            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
           </div>
           <div>
             <p className="text-2xl font-black text-slate-900 tabular-nums">
@@ -126,7 +214,9 @@ export default function OwnerDashboardInterlockingClient({
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
               Status Perangkat IoT
             </span>
-            <span className="text-xl p-2 bg-emerald-50 rounded-xl">📟</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Cpu className="w-4 h-4" />
+            </div>
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -149,7 +239,9 @@ export default function OwnerDashboardInterlockingClient({
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">🚨</span>
+            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900">
                 Peringatan Anomali Sensor Flow Meter (Anti-Loss Leak Detection)
@@ -179,7 +271,9 @@ export default function OwnerDashboardInterlockingClient({
                 className="bg-red-50/70 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl p-2 bg-red-100 rounded-xl text-red-600 shrink-0">⚠️</span>
+                  <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertCircle className="w-4 h-4" />
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-red-900">{alert.branchName}</span>
@@ -210,7 +304,9 @@ export default function OwnerDashboardInterlockingClient({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl">📸</span>
+              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Camera className="w-4 h-4" />
+              </div>
               <h2 className="text-base font-extrabold text-slate-900">
                 Galeri Visual Audit Transaksi
               </h2>
@@ -222,10 +318,11 @@ export default function OwnerDashboardInterlockingClient({
 
           <Link
             href="/shift-closing"
-            className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1 self-start sm:self-auto"
+            className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 self-start sm:self-auto"
           >
-            <span>🔒 Lihat Audit Shift Closing</span>
-            <span>→</span>
+            <Lock className="w-3.5 h-3.5" />
+            <span>Lihat Audit Shift Closing</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
@@ -321,8 +418,9 @@ export default function OwnerDashboardInterlockingClient({
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex justify-between items-center text-xs">
-                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    ✓ Valid Interlocked
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Valid Interlocked</span>
                   </span>
                   <span className="font-black text-slate-900 tabular-nums">
                     {formatRupiah(tx.totalAmount)}
@@ -349,9 +447,9 @@ export default function OwnerDashboardInterlockingClient({
               <button
                 type="button"
                 onClick={() => setPreviewPhoto(null)}
-                className="text-slate-400 hover:text-slate-600 text-base"
+                className="text-slate-400 hover:text-slate-600 p-1"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-4 bg-black flex items-center justify-center max-h-[70vh]">

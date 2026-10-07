@@ -5,6 +5,17 @@ import { useBranch } from "@/context/BranchContext"
 import { ShiftClosing } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
 import BranchSelector from "@/components/branch/BranchSelector"
+import {
+  Lock,
+  ShieldCheck,
+  Calculator,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+  Send,
+  RotateCcw,
+  Receipt,
+} from "lucide-react"
 
 export default function ShiftClosingClient({
   initialClosings,
@@ -13,7 +24,7 @@ export default function ShiftClosingClient({
   initialClosings: ShiftClosing[]
   user?: { id?: string; name?: string | null; role?: string | null }
 }) {
-  const { selectedBranch, selectedBranchId } = useBranch()
+  const { selectedBranchId } = useBranch()
   const isOwnerOrManager = user?.role === "OWNER" || user?.role === "MANAGER"
 
   const [activeTab, setActiveTab] = useState<"INPUT" | "HISTORY">("INPUT")
@@ -87,7 +98,9 @@ export default function ShiftClosingClient({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">🔒</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Lock className="w-4 h-4" />
+            </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
               Tutup Shift & Audit Setoran (Blind Closing)
             </h1>
@@ -133,12 +146,12 @@ export default function ShiftClosingClient({
           <div className="lg:col-span-2 space-y-5">
             {submittedClosing ? (
               <div className="bg-white rounded-3xl p-8 border border-emerald-200 shadow-sm text-center space-y-4 animate-in zoom-in-95 duration-200">
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 text-3xl rounded-full flex items-center justify-center mx-auto">
-                  ✓
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8" />
                 </div>
                 <h2 className="text-2xl font-black text-slate-900">Tutup Shift Berhasil Tercatat</h2>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Laporan setoran tunai fisik Anda untuk cabang <b>{submittedClosing.branchName}</b> telah terkirim dan tersimpan aman di sistem audit Owner.
+                  Laporan setoran tunai fisik Anda untuk cabang <b>{submittedClosing.branchName}</b> telah terkirim dan tersimpan aman di sistem audit Owner serta dikirimkan ke Telegram Bot.
                 </p>
 
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 max-w-sm mx-auto text-left space-y-2 text-xs">
@@ -167,16 +180,17 @@ export default function ShiftClosingClient({
                 <button
                   type="button"
                   onClick={() => setSubmittedClosing(null)}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 mx-auto"
                 >
-                  Buat Input Tutup Shift Lainnya
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Buat Input Tutup Shift Lainnya</span>
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6">
                 {/* Security Badge */}
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
-                  <span className="text-2xl">🛡️</span>
+                  <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <h3 className="text-xs font-bold text-amber-950">Mode Blind Closing Aktif</h3>
                     <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
@@ -203,8 +217,9 @@ export default function ShiftClosingClient({
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-black text-slate-900 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
-                    Anda juga dapat menggunakan asisten kalkulator lembaran uang di sebelah kanan.
+                  <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
+                    <Calculator className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Anda juga dapat menggunakan asisten kalkulator lembaran uang di sebelah kanan.</span>
                   </p>
                 </div>
 
@@ -226,7 +241,14 @@ export default function ShiftClosingClient({
                   disabled={submitting}
                   className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
                 >
-                  {submitting ? "Menyimpan Data Setoran..." : "Kirim Laporan Tutup Shift Sekarang →"}
+                  {submitting ? (
+                    <span>Menyimpan Data Setoran...</span>
+                  ) : (
+                    <>
+                      <span>Kirim Laporan Tutup Shift Sekarang</span>
+                      <Send className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </form>
             )}
@@ -235,18 +257,22 @@ export default function ShiftClosingClient({
           {/* Right Column: Cash Counter Assistant */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs h-fit space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Asisten Hitung Lembaran Uang
-              </h3>
+              <div className="flex items-center gap-1.5">
+                <Calculator className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Hitung Pecahan Uang
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => {
                   setCounts({ 100000: 0, 50000: 0, 20000: 0, 10000: 0, 5000: 0, 2000: 0, 1000: 0 })
                   setPhysicalCash(0)
                 }}
-                className="text-[10px] font-bold text-red-500 hover:text-red-700"
+                className="text-[10px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
               >
-                Reset
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset</span>
               </button>
             </div>
 
@@ -301,9 +327,12 @@ export default function ShiftClosingClient({
       {activeTab === "HISTORY" && isOwnerOrManager && (
         <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
           <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-              Rekapitulasi Audit Selisih Setoran Seluruh Shift
-            </h3>
+            <div className="flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wider">
+                Rekapitulasi Audit Selisih Setoran Seluruh Shift
+              </h3>
+            </div>
             <span className="text-xs text-slate-500">
               Total {closings.length} Laporan
             </span>
@@ -358,7 +387,7 @@ export default function ShiftClosingClient({
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
+                            className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${
                               isMatch
                                 ? "bg-emerald-100 text-emerald-800"
                                 : isDeficit
@@ -366,7 +395,22 @@ export default function ShiftClosingClient({
                                 : "bg-amber-100 text-amber-800"
                             }`}
                           >
-                            {isMatch ? "✓ Cocok / Valid" : isDeficit ? "⚠️ Selisih Kurang" : "ℹ️ Selisih Lebih"}
+                            {isMatch ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Cocok / Valid</span>
+                              </>
+                            ) : isDeficit ? (
+                              <>
+                                <AlertTriangle className="w-3 h-3 text-red-600" />
+                                <span>Selisih Kurang</span>
+                              </>
+                            ) : (
+                              <>
+                                <Info className="w-3 h-3 text-amber-600" />
+                                <span>Selisih Lebih</span>
+                              </>
+                            )}
                           </span>
                         </td>
                       </tr>

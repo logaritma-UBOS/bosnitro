@@ -1,8 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import {
+  Home,
+  Package,
+  Lock,
+  Receipt,
+  Menu,
+  Plus,
+  DollarSign,
+  Users,
+  TrendingUp,
+  BarChart3,
+  ReceiptText,
+  MessageSquare,
+  LogOut,
+  X,
+} from "lucide-react"
 
 export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
   const [isMoreOpen, setIsMoreOpen] = useState(false)
@@ -18,23 +34,25 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
   }
 
   const navItemClass = (path: string) =>
-    `flex flex-col items-center justify-center flex-1 h-full ${isActive(path) ? "text-emerald-600 font-bold" : "text-slate-400 hover:text-slate-700"}`
+    `flex flex-col items-center justify-center flex-1 h-full ${
+      isActive(path) ? "text-emerald-600 font-bold" : "text-slate-400 hover:text-slate-700"
+    }`
 
   let menuCategories = [
     {
       title: "KELOLA",
       links: [
-        { label: "Tutup Shift", href: "/shift-closing", icon: "🔒" },
-        { label: "Pengeluaran", href: "/pengeluaran", icon: "💸" },
-        { label: "Pegawai", href: "/pengaturan/pegawai", icon: "👥" },
+        { label: "Tutup Shift", href: "/shift-closing", icon: Lock },
+        { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign },
+        { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users },
       ],
     },
     {
       title: "PAHAMI BISNIS",
       links: [
-        { label: "Performa Produk", href: "/performa-produk", icon: "📈" },
-        { label: "Rata-rata Belanja", href: "/performa-aov", icon: "💰" },
-        { label: "Laporan Keuangan", href: "/laporan", icon: "📄" },
+        { label: "Performa Produk", href: "/performa-produk", icon: TrendingUp },
+        { label: "Rata-rata Belanja", href: "/performa-aov", icon: BarChart3 },
+        { label: "Laporan Keuangan", href: "/laporan", icon: ReceiptText },
       ],
     },
   ]
@@ -72,28 +90,24 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
         {/* BERANDA (OWNER ONLY) */}
         {role === "OWNER" && (
           <Link href="/beranda" className={navItemClass("/beranda")}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-            </svg>
-            <span className="text-[10px] font-semibold mt-0.5">Beranda</span>
+            <Home className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-1">Beranda</span>
           </Link>
         )}
 
         {/* KATALOG (OWNER & MANAGER) */}
         {(role === "OWNER" || role === "MANAGER") && (
           <Link href="/katalog" className={navItemClass("/katalog")}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-            </svg>
-            <span className="text-[10px] font-semibold mt-0.5">Katalog</span>
+            <Package className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-1">Katalog</span>
           </Link>
         )}
 
         {/* TUTUP SHIFT (KASIR direct on bottom nav) */}
         {role === "KASIR" && (
           <Link href="/shift-closing" className={navItemClass("/shift-closing")}>
-            <span className="text-lg">🔒</span>
-            <span className="text-[10px] font-semibold mt-0.5">Tutup Shift</span>
+            <Lock className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-1">Tutup Shift</span>
           </Link>
         )}
 
@@ -103,9 +117,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
             href="/kasir"
             className="bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(16,185,129,0.35)] hover:scale-105 transition-transform active:scale-95 border-[3px] border-white"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus className="h-6 w-6 stroke-[3]" />
           </Link>
           <span className="text-[10px] font-black text-emerald-600 mt-1 tracking-tight">KASIR</span>
         </div>
@@ -113,10 +125,8 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
         {/* RIWAYAT (OWNER & MANAGER) */}
         {(role === "OWNER" || role === "MANAGER") && (
           <Link href="/riwayat" className={navItemClass("/riwayat")}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-            </svg>
-            <span className="text-[10px] font-semibold mt-0.5">Riwayat</span>
+            <Receipt className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-1">Riwayat</span>
           </Link>
         )}
 
@@ -127,10 +137,8 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
             isMoreOpen ? "text-emerald-600 font-bold" : "text-slate-400 hover:text-slate-700"
           }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-          </svg>
-          <span className="text-[10px] font-semibold mt-0.5">Lainnya</span>
+          <Menu className="w-5 h-5" />
+          <span className="text-[10px] font-semibold mt-1">Lainnya</span>
         </button>
       </div>
 
@@ -153,7 +161,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                 onClick={() => setIsMoreOpen(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -164,19 +172,24 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                     {category.title}
                   </h3>
                   <div className="grid grid-cols-3 gap-2.5">
-                    {category.links.map((link, i) => (
-                      <Link
-                        key={i}
-                        href={link.href}
-                        onClick={() => setIsMoreOpen(false)}
-                        className="flex flex-col items-center justify-center gap-1.5 p-3 bg-white rounded-2xl border border-gray-100 shadow-xs active:scale-95 transition-all text-center"
-                      >
-                        <span className="text-2xl">{link.icon}</span>
-                        <span className="text-[11px] font-bold text-gray-700 leading-tight">
-                          {link.label}
-                        </span>
-                      </Link>
-                    ))}
+                    {category.links.map((link, i) => {
+                      const IconComp = link.icon
+                      return (
+                        <Link
+                          key={i}
+                          href={link.href}
+                          onClick={() => setIsMoreOpen(false)}
+                          className="flex flex-col items-center justify-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 shadow-xs active:scale-95 transition-all text-center"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-700">
+                            <IconComp className="w-5 h-5 text-emerald-600" />
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-700 leading-tight">
+                            {link.label}
+                          </span>
+                        </Link>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
@@ -191,9 +204,11 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                       setIsMoreOpen(false)
                       setTimeout(() => window.dispatchEvent(new Event("open-live-chat")), 300)
                     }}
-                    className="flex flex-col items-center justify-center gap-1.5 p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-xs text-center transition-all"
+                    className="flex flex-col items-center justify-center gap-2 p-3 bg-white hover:bg-gray-50 rounded-2xl border border-gray-100 shadow-xs text-center transition-all"
                   >
-                    <span className="text-2xl">💬</span>
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
                     <span className="text-[11px] font-bold text-gray-700 leading-tight">Support</span>
                   </button>
                 </div>
@@ -207,9 +222,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                   }}
                   className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition-colors text-sm"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-                  </svg>
+                  <LogOut className="w-4 h-4" />
                   Keluar ({role})
                 </button>
               </div>

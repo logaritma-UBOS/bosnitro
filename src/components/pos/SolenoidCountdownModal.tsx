@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Gauge, Clock, CheckCircle2 } from "lucide-react"
 
 type SolenoidCountdownModalProps = {
   isOpen: boolean
@@ -49,11 +50,14 @@ export default function SolenoidCountdownModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 text-center p-6 sm:p-8 flex flex-col items-center">
         {/* Header Badge */}
-        <div className={`px-4 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-6 flex items-center gap-1.5 ${
-          isFinished ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-800 animate-pulse"
-        }`}>
-          <span className={`w-2 h-2 rounded-full ${isFinished ? "bg-slate-400" : "bg-emerald-500"}`}></span>
-          {isFinished ? "Katup Solenoid Tertutup Otomatis" : "ESP32 Solenoid Valve Sedang Terbuka"}
+        <div
+          className={`px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider mb-6 flex items-center gap-2 ${
+            isFinished ? "bg-slate-100 text-slate-700" : "bg-emerald-100 text-emerald-800"
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full ${isFinished ? "bg-slate-400" : "bg-emerald-500 animate-ping"}`}></span>
+          <Gauge className="w-3.5 h-3.5" />
+          <span>{isFinished ? "Katup Solenoid Tertutup Otomatis" : "ESP32 Solenoid Valve Sedang Terbuka"}</span>
         </div>
 
         {/* Circular Countdown Progress */}
@@ -86,8 +90,9 @@ export default function SolenoidCountdownModal({
             <span className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight tabular-nums">
               {remaining}
             </span>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-              Detik Sisa
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>Detik Sisa</span>
             </span>
           </div>
         </div>
@@ -121,13 +126,20 @@ export default function SolenoidCountdownModal({
         <button
           type="button"
           onClick={onClose}
-          className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-[0.99] ${
+          className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-[0.99] flex items-center justify-center gap-2 ${
             isFinished
               ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
               : "bg-slate-800 hover:bg-slate-900 text-white"
           }`}
         >
-          {isFinished ? "Selesai & Buka Transaksi Baru ✓" : "Tutup Jendela (Katup Tetap Menghitung)"}
+          {isFinished ? (
+            <>
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Selesai & Buka Transaksi Baru</span>
+            </>
+          ) : (
+            <span>Tutup Jendela (Katup Tetap Menghitung)</span>
+          )}
         </button>
       </div>
     </div>
