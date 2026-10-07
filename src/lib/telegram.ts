@@ -5,6 +5,7 @@ import { getTransactions, getShiftClosings, getFraudAlerts, getBranches } from "
 export const DEFAULT_TELEGRAM_RECIPIENT = "083153598697"
 
 let activeTelegramRecipient = DEFAULT_TELEGRAM_RECIPIENT
+let activeTelegramChatId: string | null = null
 
 export function getActiveTelegramRecipient(): string {
   return activeTelegramRecipient
@@ -16,15 +17,23 @@ export function setActiveTelegramRecipient(phone: string) {
   }
 }
 
+export function getActiveTelegramChatId(): string | null {
+  return activeTelegramChatId
+}
+
+export function setActiveTelegramChatId(chatId: string | null) {
+  activeTelegramChatId = chatId && chatId.trim() ? chatId.trim() : null
+}
+
 /**
  * Telegram Notification Helper for IoT Fraud & Anomaly Alerts
  */
 export async function sendTelegramAlert(message: string): Promise<boolean> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
+  const targetChatId = activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
 
-  if (!botToken || !chatId) {
-    console.log(`[Telegram Alert Fallback -> Target: ${activeTelegramRecipient}]:\n`, message)
+  if (!botToken || !targetChatId) {
+    console.log(`[Telegram Alert Fallback -> Target Phone: ${activeTelegramRecipient} | ChatId: ${targetChatId || "none"}]:\n`, message)
     return false
   }
 
@@ -33,7 +42,7 @@ export async function sendTelegramAlert(message: string): Promise<boolean> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: targetChatId,
         text: message,
         parse_mode: "HTML",
       }),
@@ -162,7 +171,11 @@ ${allAlerts.length > 0 ? allAlerts.map(a => `  ⚠️ [${a.branchName}] ${a.mess
 /**
  * Dispatch Daily Branch Report to Telegram Bot
  */
-export async function sendDailyBranchReportTelegram(branchId?: string, targetRecipient?: string): Promise<{
+export async function sendDailyBranchReportTelegram(
+  branchId?: string,
+  targetRecipient?: string,
+  targetChatId?: string
+): Promise<{
   success: boolean
   message: string
   reportText: string
@@ -171,6 +184,8 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
   whatsappUrl: string
 }> {
   const recipient = targetRecipient || activeTelegramRecipient
+  const destinationChatId = targetChatId || activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
+
   const { reportText, branchName } = await generateDailyBranchReportText(branchId, recipient)
 
   // Direct share link to Telegram
@@ -186,10 +201,9 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
   const whatsappUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(cleanTextForUrl)}`
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
 
-  if (!botToken || !chatId) {
-    console.log(`[Telegram Bot Report to ${recipient}] (Bot token/chatId belum diset di .env):\n${cleanTextForUrl}`)
+  if (!botToken || !destinationChatId) {
+    console.log(`[Telegram Bot Report to ${recipient} | ChatId: ${destinationChatId || "none"}] (Bot token/chatId belum diset di .env):\n${cleanTextForUrl}`)
     return {
       success: true,
       message: `Laporan cabang "${branchName}" berhasil disiapkan untuk ${recipient}. Teks siap disalin atau dibuka via Telegram/WhatsApp.`,
@@ -205,7 +219,7 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: destinationChatId,
         text: reportText,
         parse_mode: "HTML",
       }),
@@ -214,7 +228,7 @@ export async function sendDailyBranchReportTelegram(branchId?: string, targetRec
     if (res.ok) {
       return {
         success: true,
-        message: `Laporan cabang "${branchName}" berhasil dikirim langsung ke Telegram bot penerima ${recipient}.`,
+        message: `Laporan cabang "${branchName}" berhasil dikirim langsung ke Bot / Grup Telegram (${destinationChatId}).`,
         reportText,
         cleanText: cleanTextForUrl,
         shareUrl,

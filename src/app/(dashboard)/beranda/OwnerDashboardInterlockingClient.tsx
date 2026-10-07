@@ -41,12 +41,14 @@ export default function OwnerDashboardInterlockingClient({
 
   // Dynamic Telegram phone number from user account & store settings
   const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "083153598697")
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch("/api/settings/store")
       .then((res) => res.json())
       .then((data) => {
         if (data.telegramPhone) setTelegramPhone(data.telegramPhone)
+        if (data.telegramChatId) setTelegramChatId(data.telegramChatId)
       })
       .catch(() => {})
   }, [])
@@ -72,6 +74,7 @@ export default function OwnerDashboardInterlockingClient({
         body: JSON.stringify({
           branchId: selectedBranchId,
           recipient: telegramPhone,
+          chatId: telegramChatId || undefined,
         }),
       })
       const data = await res.json()

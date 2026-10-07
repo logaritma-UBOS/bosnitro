@@ -21,6 +21,7 @@ import {
   Trash2,
   Copy,
   MessageCircle,
+  Hash,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -31,6 +32,7 @@ export default function StoreSettingsClient({
   const { branches, refreshBranches } = useBranch()
   const [storeName, setStoreName] = useState(initialSettings.storeName)
   const [telegramPhone, setTelegramPhone] = useState(initialSettings.telegramPhone)
+  const [telegramChatId, setTelegramChatId] = useState(initialSettings.telegramChatId || "")
   const [profileImage, setProfileImage] = useState<string | null>(initialSettings.profileImage)
   
   const [saving, setSaving] = useState(false)
@@ -97,6 +99,7 @@ export default function StoreSettingsClient({
           storeName: storeName.trim(),
           profileImage,
           telegramPhone: telegramPhone.trim(),
+          telegramChatId: telegramChatId.trim(),
         }),
       })
 
@@ -124,6 +127,7 @@ export default function StoreSettingsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           recipient: telegramPhone.trim(),
+          chatId: telegramChatId.trim() || undefined,
         }),
       })
 
@@ -187,7 +191,7 @@ export default function StoreSettingsClient({
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
-            Kelola nama toko, logo/foto profil, nomor Telegram pelaporan harian, dan cabang outlet
+            Kelola nama toko, logo/foto profil, integrasi grup Telegram, dan cabang gerai
           </p>
         </div>
       </div>
@@ -195,7 +199,7 @@ export default function StoreSettingsClient({
       {saveSuccess && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-xs font-bold text-emerald-800 animate-in fade-in duration-200">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>Pengaturan toko dan nomor Telegram berhasil disimpan dan disinkronkan ke seluruh sistem!</span>
+          <span>Pengaturan toko dan integrasi Telegram berhasil disimpan dan disinkronkan ke seluruh sistem!</span>
         </div>
       )}
 
@@ -281,7 +285,26 @@ export default function StoreSettingsClient({
                 />
               </div>
               <p className="text-[11px] text-slate-500 mt-1">
-                Tersinkronisasi otomatis dengan nomor telepon akun saat registrasi. Laporan omzet harian per cabang dan alert anomali sensor flow meter dikirimkan ke nomor ini.
+                Tersinkronisasi otomatis dengan nomor telepon akun saat registrasi.
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                ID Chat / ID Grup Telegram Toko (Opsional untuk Kirim Otomatis ke Grup)
+              </label>
+              <div className="relative">
+                <Hash className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value)}
+                  placeholder="Contoh ID Grup: -100xxxxxxxxxx atau ID Chat Akun"
+                  className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Gunakan ID Grup jika Anda ingin laporan otomatis masuk ke grup Telegram tim/manajer toko Anda. Bot UBOS akan otomatis memposting laporan ke grup ini.
               </p>
 
               {/* Tombol Uji Coba Laporan Telegram & Opsi Fleksibel */}
@@ -345,12 +368,9 @@ export default function StoreSettingsClient({
                 )}
 
                 <div className="text-[10px] text-slate-500 bg-white p-3 rounded-xl border border-slate-200/60 space-y-1">
-                  <p className="font-bold text-slate-700">💡 Mengapa muncul tombol Share di Telegram?</p>
+                  <p className="font-bold text-slate-700">💡 Cara Kerja Multi-Tenant Grup Telegram:</p>
                   <p>
-                    Tautan <code className="text-sky-600">t.me/share</code> adalah tautan pengirim bawaan Telegram. Di perangkat komputer, tombol <b>SHARE</b> di web tersebut memerlukan aplikasi Telegram Desktop terpasang.
-                  </p>
-                  <p>
-                    Sebagai alternatif yang 100% praktis, Anda bisa langsung klik tombol <b>Salin Teks Laporan</b> di atas (lalu Paste ke Telegram Web/grup) atau klik <b>Kirim via WhatsApp Langsung</b> ke nomor Anda!
+                    Setiap toko yang mendaftar memiliki data grup yang terisolasi. Jika Anda mengisikan ID Grup di atas, bot akan mengirimkan laporan harian langsung ke grup toko Anda tanpa tercampur dengan toko pengguna lain.
                   </p>
                 </div>
               </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { updateStoreSettings, getStoreSettings } from "@/lib/interlockingDb"
-import { setActiveTelegramRecipient, DEFAULT_TELEGRAM_RECIPIENT } from "@/lib/telegram"
+import { setActiveTelegramRecipient, setActiveTelegramChatId, DEFAULT_TELEGRAM_RECIPIENT } from "@/lib/telegram"
 
 export async function GET() {
   try {
@@ -28,16 +28,21 @@ export async function GET() {
     const profileImage = user?.image || runtime.profileImage || null
     // Inisialisasi nomor telegram dari nomor telepon akun saat registrasi, atau fallback
     const telegramPhone = user?.phone?.trim() || runtime.telegramPhone || DEFAULT_TELEGRAM_RECIPIENT
+    const telegramChatId = runtime.telegramChatId || null
 
     // Pastikan sinkronisasi telegram runtime
     if (telegramPhone) {
       setActiveTelegramRecipient(telegramPhone)
+    }
+    if (telegramChatId) {
+      setActiveTelegramChatId(telegramChatId)
     }
 
     return NextResponse.json({
       storeName,
       profileImage,
       telegramPhone,
+      telegramChatId,
       userEmail: user?.email || "",
       userName: user?.name || "",
     })
@@ -55,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { storeName, profileImage, telegramPhone } = body
+    const { storeName, profileImage, telegramPhone, telegramChatId } = body
 
     if (!storeName || !storeName.trim()) {
       return NextResponse.json({ error: "Nama toko wajib diisi" }, { status: 400 })
@@ -63,6 +68,7 @@ export async function POST(req: NextRequest) {
 
     const cleanStoreName = storeName.trim()
     const cleanTelegramPhone = (telegramPhone || "").trim()
+    const cleanTelegramChatId = (telegramChatId || "").trim() || null
 
     // 1. Update User (phone & image)
     await prisma.user.update({
@@ -91,20 +97,23 @@ export async function POST(req: NextRequest) {
       storeName: cleanStoreName,
       profileImage: profileImage !== undefined ? profileImage : undefined,
       telegramPhone: cleanTelegramPhone || undefined,
+      telegramChatId: cleanTelegramChatId,
     })
 
-    // 4. Sinkronisasi langsung ke active telegram recipient
+    // 4. Sinkronisasi langsung ke active telegram recipient & chat id
     if (cleanTelegramPhone) {
       setActiveTelegramRecipient(cleanTelegramPhone)
     }
+    setActiveTelegramChatId(cleanTelegramChatId)
 
     return NextResponse.json({
       success: true,
-      message: "Pengaturan toko dan nomor Telegram berhasil diperbarui!",
+      message: "Pengaturan toko dan integrasi Telegram berhasil diperbarui!",
       data: {
         storeName: cleanStoreName,
         profileImage,
         telegramPhone: cleanTelegramPhone,
+        telegramChatId: cleanTelegramChatId,
       }
     })
   } catch (error: any) {

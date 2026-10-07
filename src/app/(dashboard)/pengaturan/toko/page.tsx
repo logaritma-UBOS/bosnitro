@@ -4,7 +4,7 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { getStoreSettings } from "@/lib/interlockingDb"
-import { DEFAULT_TELEGRAM_RECIPIENT, setActiveTelegramRecipient } from "@/lib/telegram"
+import { DEFAULT_TELEGRAM_RECIPIENT, setActiveTelegramRecipient, setActiveTelegramChatId } from "@/lib/telegram"
 import StoreSettingsClient from "./StoreSettingsClient"
 import { Metadata } from "next"
 
@@ -40,15 +40,20 @@ export default async function StoreSettingsPage() {
   const profileImage = user?.image || runtime.profileImage || null
   // Inisialisasi awal nomor telegram dari nomor telepon akun pendaftaran (User.phone)
   const telegramPhone = user?.phone?.trim() || runtime.telegramPhone || DEFAULT_TELEGRAM_RECIPIENT
+  const telegramChatId = runtime.telegramChatId || null
 
   if (telegramPhone) {
     setActiveTelegramRecipient(telegramPhone)
+  }
+  if (telegramChatId) {
+    setActiveTelegramChatId(telegramChatId)
   }
 
   const initialSettings = {
     storeName,
     profileImage,
     telegramPhone,
+    telegramChatId,
     userEmail: user?.email || "",
     userName: user?.name || "",
   }

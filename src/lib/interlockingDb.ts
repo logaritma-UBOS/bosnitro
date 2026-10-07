@@ -10,16 +10,28 @@ let runtimeStoreSettings = {
   storeName: "Toko meruvin",
   profileImage: null as string | null,
   telegramPhone: "083153598697",
+  telegramChatId: null as string | null,
 }
 
-export async function getStoreSettings(): Promise<{ storeName: string; profileImage: string | null; telegramPhone: string }> {
+export async function getStoreSettings(): Promise<{
+  storeName: string
+  profileImage: string | null
+  telegramPhone: string
+  telegramChatId: string | null
+}> {
   return runtimeStoreSettings
 }
 
-export async function updateStoreSettings(data: { storeName?: string; profileImage?: string | null; telegramPhone?: string }) {
+export async function updateStoreSettings(data: {
+  storeName?: string
+  profileImage?: string | null
+  telegramPhone?: string
+  telegramChatId?: string | null
+}) {
   if (data.storeName !== undefined && data.storeName.trim()) runtimeStoreSettings.storeName = data.storeName.trim()
   if (data.profileImage !== undefined) runtimeStoreSettings.profileImage = data.profileImage
   if (data.telegramPhone !== undefined && data.telegramPhone.trim()) runtimeStoreSettings.telegramPhone = data.telegramPhone.trim()
+  if (data.telegramChatId !== undefined) runtimeStoreSettings.telegramChatId = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : null
   return runtimeStoreSettings
 }
 
