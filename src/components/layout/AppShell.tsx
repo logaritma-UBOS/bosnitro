@@ -24,7 +24,7 @@ export default async function AppShell({
         <DesktopSidebar businessName={businessName} role={role} />
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 overflow-x-hidden pb-16 lg:pb-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden pb-20 lg:pb-6">
           <FeatureGuard>
             {children}
           </FeatureGuard>

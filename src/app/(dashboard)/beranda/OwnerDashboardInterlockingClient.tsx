@@ -130,7 +130,7 @@ export default function OwnerDashboardInterlockingClient({
               <BarChart3 className="w-5 h-5" />
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-              Dashboard Anti-Loss & Pengawasan Multi-Cabang
+              Dashboard Anti-Loss 
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">

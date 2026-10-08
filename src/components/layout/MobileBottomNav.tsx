@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { logoutUser } from "@/actions/auth"
 import {
   Home,
   Package,
@@ -136,24 +137,35 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
 
         {/* LAINNYA (ALL ROLES) */}
         <button
-          onClick={() => setIsMoreOpen(true)}
-          className={`flex flex-col items-center justify-center flex-1 h-full ${
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setIsMoreOpen((prev) => !prev)
+          }}
+          className={`flex flex-col items-center justify-center flex-1 h-full cursor-pointer select-none active:scale-95 transition-all ${
             isMoreOpen ? "text-emerald-600 font-bold" : "text-slate-400 hover:text-slate-700"
           }`}
+          aria-label="Menu lainnya"
         >
-          <Menu className="w-5 h-5" />
-          <span className="text-[10px] font-semibold mt-1">Lainnya</span>
+          <Menu className="w-5 h-5 pointer-events-none" />
+          <span className="text-[10px] font-semibold mt-1 pointer-events-none">Lainnya</span>
         </button>
       </div>
 
       {/* MORE MENU BOTTOM SHEET */}
       {isMoreOpen && (
-        <div
-          className="fixed inset-0 z-[70] flex justify-center items-end bg-slate-900/40 backdrop-blur-sm sm:items-center p-0 lg:hidden"
-          onClick={() => setIsMoreOpen(false)}
-        >
+        <div className="fixed inset-0 z-[70] flex justify-center items-end sm:items-center p-0 lg:hidden">
+          {/* Backdrop Overlay */}
           <div
-            className="bg-white w-full max-h-[85vh] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-full duration-300"
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity duration-200"
+            onClick={() => setIsMoreOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Drawer Card */}
+          <div
+            className="relative z-10 bg-white w-full max-h-[85vh] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white">
@@ -162,14 +174,16 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                 <p className="text-xs text-gray-400">Hak Akses: {role}</p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsMoreOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 font-bold"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 active:scale-95 font-bold cursor-pointer transition-all"
+                aria-label="Tutup menu"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-safe space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-5">
               {menuCategories.map((category, catIdx) => (
                 <div key={catIdx}>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-2">
@@ -215,13 +229,15 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
             </div>
 
             <div className="p-4 border-t border-gray-100 bg-white">
-              <Link
-                href="/login"
-                className="flex items-center justify-center gap-2 w-full p-3 rounded-2xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Keluar dari Aplikasi</span>
-              </Link>
+              <form action={logoutUser}>
+                <button
+                  type="submit"
+                  className="flex items-center justify-center gap-2 w-full p-3 rounded-2xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 active:scale-95 transition-all cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Keluar dari Aplikasi</span>
+                </button>
+              </form>
             </div>
           </div>
         </div>

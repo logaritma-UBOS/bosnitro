@@ -201,7 +201,7 @@ export default function UbosFeed({ position = "bottom" }: { position?: "top" | "
 
         {/* Article Modal Overlay */}
         {activeArticle && (
-          <div className="fixed inset-0 z-50 flex justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[85] flex justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95">
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white">

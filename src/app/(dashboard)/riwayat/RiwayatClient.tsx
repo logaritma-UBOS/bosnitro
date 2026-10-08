@@ -62,16 +62,8 @@ export default function RiwayatClient({ plan }: { plan?: string }) {
           status: "PENDING"
         }))
 
-        // Merge and sort
+        // Merge and sort without artificial date restrictions
         let merged = [...pendingSales, ...dbSales].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        
-        const tier = tierData.tier || "Starter"
-        if (tier === "Starter") {
-          const sevenDaysAgo = new Date()
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-          merged = merged.filter(m => new Date(m.createdAt) >= sevenDaysAgo)
-        }
-        
         setSales(merged)
       } catch (e) {
         console.error(e)
@@ -108,11 +100,6 @@ export default function RiwayatClient({ plan }: { plan?: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-20 max-w-7xl mx-auto">
-      {tier === "Starter" && (
-        <div className="bg-amber-100 text-amber-800 text-xs font-bold text-center px-4 py-2 border-b border-amber-200">
-          Paket Starter: Riwayat dibatasi 7 hari terakhir. Upgrade ke Pro/Lifetime untuk akses riwayat tanpa batas.
-        </div>
-      )}
       {/* HEADER FLAT STANDAR */}
       <div className="bg-white px-4 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200">
         <div className="mb-4 md:mb-0">
@@ -126,11 +113,12 @@ export default function RiwayatClient({ plan }: { plan?: string }) {
           <select 
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2"
+            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 cursor-pointer font-medium"
           >
             <option value="today">Hari Ini</option>
             <option value="7d">7 Hari Terakhir</option>
-            <option value="30d" disabled={tier === "Starter"}>{tier === "Starter" ? "30 Hari (Terkunci)" : "30 Hari Terakhir"}</option>
+            <option value="30d">30 Hari Terakhir</option>
+            <option value="all">Semua Riwayat</option>
           </select>
         </div>
       </div>
