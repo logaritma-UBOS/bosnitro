@@ -159,9 +159,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      else if (new URL(url).origin === baseUrl) return url
-      return `${baseUrl}/`
+      let resolvedBase = baseUrl;
+
+      // In production or Vercel, guarantee redirect stays on custom domain and never redirects to localhost
+      if (
+        resolvedBase.includes("localhost") ||
+        !resolvedBase.startsWith("http")
+      ) {
+        if (process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes("localhost")) {
+          resolvedBase = process.env.NEXT_PUBLIC_APP_URL;
+        } else if (process.env.AUTH_URL && !process.env.AUTH_URL.includes("localhost")) {
+          resolvedBase = process.env.AUTH_URL;
+        } else if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+          resolvedBase = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+        } else if (process.env.VERCEL_URL) {
+          resolvedBase = `https://${process.env.VERCEL_URL}`;
+        } else if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+          resolvedBase = "https://bosnitro.logaritma.id";
+        }
+      }
+
+      if (url.startsWith("/")) {
+        return `${resolvedBase}${url}`;
+      }
+
+      try {
+        const u = new URL(url);
+        if (
+          u.hostname.includes("logaritma.id") ||
+          u.hostname.includes("vercel.app") ||
+          u.origin === resolvedBase
+        ) {
+          return url;
+        }
+      } catch {}
+
+      return `${resolvedBase}/`;
     }
   },
   pages: {
