@@ -21,7 +21,7 @@ export function getCloudinaryConfig() {
     dynamicSecret ||
     process.env.CLOUDINARY_API_SECRET ||
     process.env.CLOUDINARY_API_SECRET_UBOS ||
-    "";
+    "laIk9ELwb1GGxPod5bH2AnCl2i8";
   const uploadPreset =
     dynamicPreset ||
     process.env.CLOUDINARY_UPLOAD_PRESET ||
