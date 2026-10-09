@@ -20,6 +20,7 @@ import {
   LogOut,
   X,
   Store,
+  ShieldCheck,
 } from "lucide-react"
 
 export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
@@ -45,9 +46,11 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
       title: "KELOLA",
       links: [
         { label: "Tutup Shift", href: "/shift-closing", icon: Lock },
+        { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck },
+        { label: "Pelanggan CRM", href: "/crm", icon: Users },
         { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign },
         { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users },
-        { label: "Pengaturan Toko", href: "/pengaturan/toko", icon: Store },
+        { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store },
       ],
     },
     {

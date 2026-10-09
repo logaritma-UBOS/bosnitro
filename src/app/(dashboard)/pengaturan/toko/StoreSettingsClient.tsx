@@ -1,12 +1,17 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useBranch } from "@/context/BranchContext"
-import { StoreProfileSettings, Branch } from "@/types/branch"
+import { StoreProfileSettings, HardwareSettings } from "@/types/branch"
 import AddBranchModal from "@/components/branch/AddBranchModal"
+import { formatRupiah } from "@/lib/format"
+import {
+  formatTextReceipt,
+  printDirectWebBluetooth,
+  getRawBtIntentUrl,
+} from "@/lib/bluetoothPrinter"
 import {
   Store,
-  User,
   Phone,
   Camera,
   Building2,
@@ -22,6 +27,13 @@ import {
   Copy,
   MessageCircle,
   Hash,
+  Radio,
+  Video,
+  Printer,
+  Trophy,
+  Zap,
+  Play,
+  Check,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -30,14 +42,47 @@ export default function StoreSettingsClient({
   initialSettings: StoreProfileSettings
 }) {
   const { branches, refreshBranches } = useBranch()
+  const [activeTab, setActiveTab] = useState<"PROFIL" | "CABANG" | "HARDWARE" | "TARGET_REWARD">("PROFIL")
+
+  // Store Profile State
   const [storeName, setStoreName] = useState(initialSettings.storeName)
   const [telegramPhone, setTelegramPhone] = useState(initialSettings.telegramPhone)
   const [telegramChatId, setTelegramChatId] = useState(initialSettings.telegramChatId || "")
   const [profileImage, setProfileImage] = useState<string | null>(initialSettings.profileImage)
-  
+
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  // Hardware Settings State
+  const [hwSettings, setHwSettings] = useState<HardwareSettings>({
+    esp32Ip: "192.168.1.150:81",
+    esp32Token: "UBOS-SECURE-KEY-8899",
+    motorTimerTambah: 15,
+    motorTimerBaru: 30,
+    mobilTimerTambah: 30,
+    mobilTimerFull: 60,
+    cctvSnapshotUrl: "http://192.168.1.180/cgi-bin/snapshot.cgi",
+    cctvCaptureMode: "BOTH",
+    cctvAuthUser: "admin",
+    cctvAuthPass: "admin123",
+    bluetoothPrinterName: "RPP02N / MPT-II",
+    bluetoothPrinterMac: "66:32:B1:88:9F:12",
+    paperSize: "58mm",
+    printerDriverMode: "WEB_BLUETOOTH",
+    autoPrintAfterPayment: true,
+    targetDailyOmzet: 2500000,
+    rewardBonusPool: 2000000,
+    rewardCriteria: "DAILY_AVG_TARGET",
+  })
+
+  // Hardware Test Results
+  const [espTestResult, setEspTestResult] = useState<string | null>(null)
+  const [testingEsp, setTestingEsp] = useState(false)
+  const [cctvTestResult, setCctvTestResult] = useState<{ message: string; url?: string } | null>(null)
+  const [testingCctv, setTestingCctv] = useState(false)
+  const [printerTestResult, setPrinterTestResult] = useState<string | null>(null)
+  const [testingPrinter, setTestingPrinter] = useState(false)
 
   // Test telegram state
   const [testingTelegram, setTestingTelegram] = useState(false)
@@ -51,6 +96,18 @@ export default function StoreSettingsClient({
 
   // Add branch modal state
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false)
+
+  // Load hardware settings on mount
+  useEffect(() => {
+    fetch("/api/hardware/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && !data.error) {
+          setHwSettings((prev) => ({ ...prev, ...data }))
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   // Photo upload handler
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,22 +126,18 @@ export default function StoreSettingsClient({
       if (res.ok && data.url) {
         setProfileImage(data.url)
       } else {
-        // Fallback to local base64 preview
         const reader = new FileReader()
-        reader.onloadend = () => {
-          setProfileImage(reader.result as string)
-        }
+        reader.onloadend = () => setProfileImage(reader.result as string)
         reader.readAsDataURL(file)
       }
-    } catch (err) {
+    } catch {
       const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileImage(reader.result as string)
-      }
+      reader.onloadend = () => setProfileImage(reader.result as string)
       reader.readAsDataURL(file)
     }
   }
 
+  // Save Store Profile
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -104,9 +157,7 @@ export default function StoreSettingsClient({
       })
 
       const data = await res.json()
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Gagal menyimpan pengaturan")
-      }
+      if (!res.ok || data.error) throw new Error(data.error || "Gagal menyimpan")
 
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -117,10 +168,117 @@ export default function StoreSettingsClient({
     }
   }
 
+  // Save Hardware & Reward Settings
+  const handleSaveHardwareSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setSaveSuccess(false)
+    setErrorMessage(null)
+
+    try {
+      const res = await fetch("/api/hardware/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(hwSettings),
+      })
+
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || "Gagal menyimpan hardware settings")
+
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (err: any) {
+      setErrorMessage(err.message || "Gagal menyimpan pengaturan hardware")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Hardware Test: ESP32 Valve
+  const handleTestEsp32 = async () => {
+    setTestingEsp(true)
+    setEspTestResult(null)
+    try {
+      const res = await fetch("/api/hardware/iot-trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          durationSeconds: hwSettings.motorTimerTambah,
+          vehicleType: "MOTOR",
+          serviceVariant: "ISI_TAMBAH",
+        }),
+      })
+      const data = await res.json()
+      setEspTestResult(data.message || "Sinyal IoT sukses terkirim ke ESP32!")
+    } catch (e: any) {
+      setEspTestResult("Gagal: " + e.message)
+    } finally {
+      setTestingEsp(false)
+    }
+  }
+
+  // Hardware Test: CCTV Snapshot
+  const handleTestCctv = async () => {
+    setTestingCctv(true)
+    setCctvTestResult(null)
+    try {
+      const res = await fetch("/api/hardware/cctv-snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          snapshotType: "PLAT_NOMOR",
+          vehiclePlate: "B 1234 TEST",
+        }),
+      })
+      const data = await res.json()
+      setCctvTestResult({
+        message: data.message || "Snapshot CCTV berhasil ditangkap!",
+        url: data.data?.imageUrl,
+      })
+    } catch (e: any) {
+      setCctvTestResult({ message: "Gagal: " + e.message })
+    } finally {
+      setTestingCctv(false)
+    }
+  }
+
+  // Hardware Test: Bluetooth Printer
+  const handleTestPrinter = async () => {
+    setTestingPrinter(true)
+    setPrinterTestResult(null)
+    try {
+      const dummyTx: any = {
+        id: "TEST-PRINT-" + Date.now().toString().slice(-4),
+        branchName: storeName || "Cabang Utama",
+        cashierName: "Admin Owner",
+        customerPlate: "B 8888 PRO",
+        createdAt: new Date().toISOString(),
+        items: [{ productName: "Test Uji Thermal Printer", quantity: 1, price: 10000, subtotal: 10000 }],
+        totalAmount: 10000,
+        paymentMethod: "CASH",
+      }
+
+      const receiptText = formatTextReceipt(dummyTx, storeName, hwSettings.paperSize, "TES HARDWARE BLUETOOTH OK")
+
+      if (hwSettings.printerDriverMode === "WEB_BLUETOOTH") {
+        const res = await printDirectWebBluetooth(receiptText)
+        setPrinterTestResult(res.message)
+      } else {
+        const url = getRawBtIntentUrl(receiptText)
+        window.location.href = url
+        setPrinterTestResult("Membuka aplikasi RawBT Helper...")
+      }
+    } catch (e: any) {
+      setPrinterTestResult("Error Printer: " + e.message)
+    } finally {
+      setTestingPrinter(false)
+    }
+  }
+
+  // Test Telegram
   const handleTestTelegram = async () => {
     setTestingTelegram(true)
     setTelegramTestResult(null)
-
     try {
       const res = await fetch("/api/telegram/daily-report", {
         method: "POST",
@@ -130,14 +288,10 @@ export default function StoreSettingsClient({
           chatId: telegramChatId.trim() || undefined,
         }),
       })
-
       const data = await res.json()
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Gagal menguji bot telegram")
-      }
-
+      if (!res.ok || data.error) throw new Error(data.error || "Gagal menguji bot")
       setTelegramTestResult({
-        message: data.message || "Format laporan berhasil disiapkan!",
+        message: data.message || "Format laporan disiapkan!",
         cleanText: data.cleanText,
         shareUrl: data.shareUrl,
         whatsappUrl: data.whatsappUrl,
@@ -149,28 +303,16 @@ export default function StoreSettingsClient({
     }
   }
 
-  const handleCopyReport = (text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2500)
-  }
-
   const handleDeleteBranch = async (branchId: string, branchName: string) => {
     if (branches.length <= 1) {
       alert("Cabang utama tidak dapat dihapus jika hanya tersisa 1 cabang.")
       return
     }
-
-    if (!confirm(`Apakah Anda yakin ingin menghapus cabang "${branchName}"?`)) {
-      return
-    }
-
+    if (!confirm(`Hapus cabang "${branchName}"?`)) return
     try {
-      const res = await fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
-        method: "DELETE",
-      })
+      const res = await fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, { method: "DELETE" })
       const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error || "Gagal menghapus cabang")
+      if (!res.ok || data.error) throw new Error(data.error)
       await refreshBranches()
     } catch (err: any) {
       alert("Error: " + err.message)
@@ -178,8 +320,8 @@ export default function StoreSettingsClient({
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-8 font-sans">
-      {/* Header */}
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 font-sans">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
@@ -187,191 +329,579 @@ export default function StoreSettingsClient({
               <Store className="w-5 h-5" />
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-              Pengaturan Toko & Profil
+              Pengaturan Toko & Hardware IoT
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
-            Kelola nama toko, logo/foto profil, integrasi grup Telegram, dan cabang gerai
+            Kelola profil outlet, cabang gerai, integrasi ESP32 & CCTV, printer Bluetooth, dan target reward 30 hari
           </p>
         </div>
       </div>
 
       {saveSuccess && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-xs font-bold text-emerald-800 animate-in fade-in duration-200">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-xs font-bold text-emerald-800 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>Pengaturan toko dan integrasi Telegram berhasil disimpan dan disinkronkan ke seluruh sistem!</span>
+          <span>Pengaturan berhasil disimpan dan disinkronkan ke seluruh sistem!</span>
         </div>
       )}
 
       {errorMessage && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 text-xs font-bold text-red-800 animate-in fade-in duration-200">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 text-xs font-bold text-red-800 animate-in fade-in">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Main Settings Form */}
-      <form onSubmit={handleSaveSettings} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Foto Profil / Logo */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col items-center justify-center text-center space-y-4">
-            <div className="relative group">
-              <div className="w-28 h-28 rounded-3xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center shadow-xs">
-                {profileImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={profileImage}
-                    alt="Logo Toko"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Store className="w-12 h-12 text-slate-300" />
-                )}
+      {/* Navigation Tabs */}
+      <div className="flex bg-slate-200/80 p-1.5 rounded-2xl gap-1 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab("PROFIL")}
+          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+            activeTab === "PROFIL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Store className="w-4 h-4 text-emerald-600" />
+          <span>Profil Toko & Telegram</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("CABANG")}
+          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+            activeTab === "CABANG" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Building2 className="w-4 h-4 text-blue-600" />
+          <span>Multi-Cabang ({branches.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("HARDWARE")}
+          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+            activeTab === "HARDWARE" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Cpu className="w-4 h-4 text-amber-600" />
+          <span>Integrasi Hardware & IoT</span>
+          <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+            ESP32 • CCTV • BT
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("TARGET_REWARD")}
+          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+            activeTab === "TARGET_REWARD" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-yellow-600" />
+          <span>Target 30 Hari & Reward</span>
+        </button>
+      </div>
+
+      {/* TAB 1: PROFIL TOKO & TELEGRAM */}
+      {activeTab === "PROFIL" && (
+        <form onSubmit={handleSaveSettings} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col items-center justify-center text-center space-y-4">
+              <div className="relative group">
+                <div className="w-28 h-28 rounded-3xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center shadow-xs">
+                  {profileImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profileImage} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <Store className="w-12 h-12 text-slate-300" />
+                  )}
+                </div>
+                <label className="absolute bottom-0 right-0 p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md cursor-pointer transition-transform group-hover:scale-105">
+                  <Camera className="w-4 h-4" />
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                </label>
               </div>
-              <label className="absolute bottom-0 right-0 p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md cursor-pointer transition-transform group-hover:scale-105">
-                <Camera className="w-4 h-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
+              <div>
+                <h3 className="text-xs font-bold text-slate-800">Logo / Foto Profil Toko</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">PNG, JPG, WEBP (Max 3MB)</p>
+              </div>
             </div>
 
+            <div className="md:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Nama Toko / Bisnis <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Store className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Nomor WhatsApp / Telegram Laporan Harian <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={telegramPhone}
+                    onChange={(e) => setTelegramPhone(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  ID Chat / Grup Telegram Toko (Opsional)
+                </label>
+                <div className="relative">
+                  <Hash className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="Contoh: -100xxxxxxxxxx"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saving ? "Menyimpan..." : "Simpan Profil Toko"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 2: MULTI-CABANG OUTLET */}
+      {activeTab === "CABANG" && (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
-              <h3 className="text-xs font-bold text-slate-800">Foto Profil / Logo Toko</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                PNG, JPG, atau WEBP (Maksimal 3MB)
+              <h2 className="text-base font-extrabold text-slate-900">
+                Kelola Cabang Outlet ({branches.length} Cabang Aktif)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Sesuai Image 2: Cabang Tambun, Cabang Cibitung 1, Cabang Cibitung 2, Cabang Cibitung 3
               </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAddBranchOpen(true)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Cabang Baru</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {branches.map((b, idx) => (
+              <div key={b.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                      {b.name}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Online
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 flex items-start gap-1 mb-2">
+                    <MapPin className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" />
+                    <span>{b.location}</span>
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                    <Cpu className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>{b.deviceId || `ESP32-${b.id}`}</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 mt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400">{idx === 0 ? "Cabang Utama" : `Cabang #${idx + 1}`}</span>
+                  {branches.length > 1 && idx !== 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBranch(b.id, b.name)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: INTEGRASI HARDWARE & IOT (Requirement #3 & Image 1) */}
+      {activeTab === "HARDWARE" && (
+        <form onSubmit={handleSaveHardwareSettings} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* SUB-PANEL 1: IOT NITROGEN (ESP32) */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Radio className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">IoT Nitrogen (ESP32)</h3>
+                  <p className="text-[10px] text-slate-500">Katup Solenoid & Relay Control</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  IP / WebSocket URI ESP32
+                </label>
+                <input
+                  type="text"
+                  value={hwSettings.esp32Ip}
+                  onChange={(e) => setHwSettings({ ...hwSettings, esp32Ip: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-xl"
+                  placeholder="192.168.1.150:81"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Token Keamanan Solenoid
+                </label>
+                <input
+                  type="password"
+                  value={hwSettings.esp32Token}
+                  onChange={(e) => setHwSettings({ ...hwSettings, esp32Token: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Motor Tambah (s)</label>
+                  <input
+                    type="number"
+                    value={hwSettings.motorTimerTambah}
+                    onChange={(e) => setHwSettings({ ...hwSettings, motorTimerTambah: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Motor Baru (s)</label>
+                  <input
+                    type="number"
+                    value={hwSettings.motorTimerBaru}
+                    onChange={(e) => setHwSettings({ ...hwSettings, motorTimerBaru: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Mobil Tambah (s)</label>
+                  <input
+                    type="number"
+                    value={hwSettings.mobilTimerTambah}
+                    onChange={(e) => setHwSettings({ ...hwSettings, mobilTimerTambah: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Mobil Kuras/Full (s)</label>
+                  <input
+                    type="number"
+                    value={hwSettings.mobilTimerFull}
+                    onChange={(e) => setHwSettings({ ...hwSettings, mobilTimerFull: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleTestEsp32}
+                  disabled={testingEsp}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>{testingEsp ? "Menguji..." : "Uji Sinyal Solenoid (15s)"}</span>
+                </button>
+                {espTestResult && (
+                  <p className="text-[10px] text-emerald-800 bg-emerald-50 p-2 rounded-lg mt-2 font-medium">
+                    {espTestResult}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* SUB-PANEL 2: AUTO-CAPTURE CCTV / SNAPSHOT */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Video className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Auto-Capture CCTV</h3>
+                  <p className="text-[10px] text-slate-500">Kamera Plat & Botol Bekas</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Mode Kamera Audit
+                </label>
+                <select
+                  value={hwSettings.cctvCaptureMode}
+                  onChange={(e) => setHwSettings({ ...hwSettings, cctvCaptureMode: e.target.value as any })}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl font-medium"
+                >
+                  <option value="BOTH">Opsi Fleksibel (Kamera Tablet/HP & CCTV IP)</option>
+                  <option value="DEVICE_CAMERA">Hanya Kamera HP / Tablet (getUserMedia)</option>
+                  <option value="CCTV_IP">Hanya CCTV IP (RTSP / HTTP Snapshot)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  URL Snapshot CCTV IP
+                </label>
+                <input
+                  type="text"
+                  value={hwSettings.cctvSnapshotUrl}
+                  onChange={(e) => setHwSettings({ ...hwSettings, cctvSnapshotUrl: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-xl"
+                  placeholder="http://192.168.1.180/snapshot.cgi"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">User CCTV</label>
+                  <input
+                    type="text"
+                    value={hwSettings.cctvAuthUser}
+                    onChange={(e) => setHwSettings({ ...hwSettings, cctvAuthUser: e.target.value })}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Password CCTV</label>
+                  <input
+                    type="password"
+                    value={hwSettings.cctvAuthPass}
+                    onChange={(e) => setHwSettings({ ...hwSettings, cctvAuthPass: e.target.value })}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleTestCctv}
+                  disabled={testingCctv}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{testingCctv ? "Mengambil..." : "Uji Ambil Snapshot CCTV"}</span>
+                </button>
+                {cctvTestResult && (
+                  <div className="mt-2 text-[10px] bg-blue-50 text-blue-900 p-2 rounded-lg font-medium">
+                    <p>{cctvTestResult.message}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SUB-PANEL 3: PRINTER STRUK MINI BLUETOOTH */}
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Printer className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Printer Struk Bluetooth</h3>
+                  <p className="text-[10px] text-slate-500">Thermal 58mm / 80mm ESC/POS</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Metode Koneksi Driver
+                </label>
+                <select
+                  value={hwSettings.printerDriverMode}
+                  onChange={(e) => setHwSettings({ ...hwSettings, printerDriverMode: e.target.value as any })}
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl font-medium"
+                >
+                  <option value="WEB_BLUETOOTH">Opsi A: Web Bluetooth API (Direct Chrome)</option>
+                  <option value="RAWBT_INTENT">Opsi B: Android RawBT Intent Helper</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Ukuran Lebar Kertas
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHwSettings({ ...hwSettings, paperSize: "58mm" })}
+                    className={`py-1.5 rounded-lg text-xs font-bold ${
+                      hwSettings.paperSize === "58mm" ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    58mm (Standar Mini)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHwSettings({ ...hwSettings, paperSize: "80mm" })}
+                    className={`py-1.5 rounded-lg text-xs font-bold ${
+                      hwSettings.paperSize === "80mm" ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    80mm (Lebar)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Nama Perangkat Bluetooth
+                </label>
+                <input
+                  type="text"
+                  value={hwSettings.bluetoothPrinterName}
+                  onChange={(e) => setHwSettings({ ...hwSettings, bluetoothPrinterName: e.target.value })}
+                  className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-xl"
+                  placeholder="RPP02N / MPT-II / Thermal-POS"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleTestPrinter}
+                  disabled={testingPrinter}
+                  className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>{testingPrinter ? "Mencetak..." : "Uji Cetak Struk Bluetooth"}</span>
+                </button>
+                {printerTestResult && (
+                  <p className="text-[10px] text-purple-900 bg-purple-50 p-2 rounded-lg mt-2 font-medium">
+                    {printerTestResult}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Card 2: Identitas Toko & Telegram */}
-          <div className="md:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Nama Toko / Bisnis <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Store className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
-                  placeholder="Nama Toko Anda"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  required
-                />
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-3 bg-slate-900 hover:bg-black text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2"
+            >
+              <Save className="w-4 h-4 text-emerald-400" />
+              <span>{saving ? "Menyimpan Hardware..." : "Simpan Seluruh Pengaturan Hardware"}</span>
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 4: TARGET 30 HARI & SISTEM REWARD (Requirement #4) */}
+      {activeTab === "TARGET_REWARD" && (
+        <form onSubmit={handleSaveHardwareSettings} className="space-y-6">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-2xl bg-yellow-100 text-yellow-700 flex items-center justify-center">
+                <Trophy className="w-5 h-5" />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Ditampilkan pada sidebar, header kasir POS, dan kop struk belanja konsumen.
-              </p>
+              <div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Target Penjualan 30 Hari & Sistem Reward Karyawan
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Konfigurasikan target omzet rata-rata harian yang akan memicu reward otomatis bagi tim outlet
+                </p>
+              </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Nomor WhatsApp / Telegram Pelaporan Harian <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  value={telegramPhone}
-                  onChange={(e) => setTelegramPhone(e.target.value)}
-                  placeholder="08xxxxxxxxxx"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
-                  required
-                />
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Tersinkronisasi otomatis dengan nomor telepon akun saat registrasi.
-              </p>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100">
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                ID Chat / ID Grup Telegram Toko (Opsional untuk Kirim Otomatis ke Grup)
-              </label>
-              <div className="relative">
-                <Hash className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="text"
-                  value={telegramChatId}
-                  onChange={(e) => setTelegramChatId(e.target.value)}
-                  placeholder="Contoh ID Grup: -100xxxxxxxxxx atau ID Chat Akun"
-                  className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
-                />
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Gunakan ID Grup jika Anda ingin laporan otomatis masuk ke grup Telegram tim/manajer toko Anda. Bot UBOS akan otomatis memposting laporan ke grup ini.
-              </p>
-
-              {/* Tombol Uji Coba Laporan Telegram & Opsi Fleksibel */}
-              <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleTestTelegram}
-                    disabled={testingTelegram}
-                    className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{testingTelegram ? "Menyiapkan..." : "Uji Coba Laporan"}</span>
-                  </button>
-
-                  {telegramTestResult?.cleanText && (
-                    <button
-                      type="button"
-                      onClick={() => handleCopyReport(telegramTestResult.cleanText!)}
-                      className={`px-3.5 py-2 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors border ${
-                        copied
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{copied ? "✓ Teks Laporan Berhasil Disalin!" : "Salin Teks Laporan"}</span>
-                    </button>
-                  )}
-
-                  {telegramTestResult?.shareUrl && (
-                    <a
-                      href={telegramTestResult.shareUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs rounded-xl transition-colors"
-                    >
-                      <span>Buka di Telegram</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-
-                  {telegramTestResult?.whatsappUrl && (
-                    <a
-                      href={telegramTestResult.whatsappUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold text-xs rounded-xl transition-colors"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Kirim via WhatsApp Langsung</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Target Rata-Rata Omzet Per Hari (Rp) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={hwSettings.targetDailyOmzet}
+                    onChange={(e) => setHwSettings({ ...hwSettings, targetDailyOmzet: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 text-sm font-black border border-slate-200 rounded-xl text-emerald-700"
+                    placeholder="2500000"
+                    required
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Proyeksi 30 Hari: <span className="font-bold text-slate-700">{formatRupiah((hwSettings.targetDailyOmzet || 0) * 30)}</span> per bulan
+                  </p>
                 </div>
 
-                {telegramTestResult && (
-                  <p className="text-[11px] text-slate-600 font-medium">
-                    {telegramTestResult.message}
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    Nominal Bonus Pool Reward (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    value={hwSettings.rewardBonusPool}
+                    onChange={(e) => setHwSettings({ ...hwSettings, rewardBonusPool: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 text-sm font-black border border-slate-200 rounded-xl text-yellow-700"
+                    placeholder="2000000"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Bonus yang akan dicairkan kepada tim/kasir saat target rata-rata 30 hari tercapai.
                   </p>
-                )}
+                </div>
+              </div>
 
-                <div className="text-[10px] text-slate-500 bg-white p-3 rounded-xl border border-slate-200/60 space-y-1">
-                  <p className="font-bold text-slate-700">💡 Cara Kerja Multi-Tenant Grup Telegram:</p>
-                  <p>
-                    Setiap toko yang mendaftar memiliki data grup yang terisolasi. Jika Anda mengisikan ID Grup di atas, bot akan mengirimkan laporan harian langsung ke grup toko Anda tanpa tercampur dengan toko pengguna lain.
+              {/* Informational Card Preview */}
+              <div className="bg-gradient-to-br from-yellow-50 to-amber-50/50 border border-yellow-200 rounded-3xl p-6 flex flex-col justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 bg-yellow-200/60 text-yellow-900 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider mb-3">
+                    <Trophy className="w-3 h-3 text-yellow-700" />
+                    <span>Logika Algoritma Reward Otomatis</span>
+                  </div>
+                  <h4 className="text-sm font-extrabold text-slate-900 mb-2">
+                    Evaluasi Performa Setiap 30 Hari
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed space-y-1">
+                    Sistem akan menghitung total omzet riil selama 30 hari terakhir dibagi 30 hari. Jika angka rata-rata harian <strong>≥ {formatRupiah(hwSettings.targetDailyOmzet || 0)}</strong>, dashboard eksekutif akan mengaktifkan badge <strong>TARGET TERCAPAI</strong> serta alokasi bonus reward karyawan sebesar <strong>{formatRupiah(hwSettings.rewardBonusPool || 0)}</strong>.
                   </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-yellow-200/80 flex items-center justify-between text-xs">
+                  <span className="font-bold text-yellow-800">Status Sistem Reward:</span>
+                  <span className="font-extrabold bg-emerald-600 text-white px-2.5 py-1 rounded-full text-[10px]">
+                    AKTIF & TERINTEGRASI
+                  </span>
                 </div>
               </div>
             </div>
@@ -380,91 +910,15 @@ export default function StoreSettingsClient({
               <button
                 type="submit"
                 disabled={saving}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
-                <span>{saving ? "Menyimpan..." : "Simpan Pengaturan"}</span>
+                <span>{saving ? "Menyimpan..." : "Simpan Target & Reward"}</span>
               </button>
             </div>
           </div>
-        </div>
-      </form>
-
-      {/* Bagian Kelola Cabang Outlet */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                Kelola Cabang Outlet ({branches.length} Cabang Aktif)
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Setiap cabang beroperasi secara mandiri dengan omzet terpisah, interlocking katup solenoid, dan audit shift
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsAddBranchOpen(true)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Cabang Baru</span>
-          </button>
-        </div>
-
-        {/* Tabel / Grid Cabang */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {branches.map((branch, index) => (
-            <div
-              key={branch.id}
-              className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-300 transition-colors"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-                    {branch.name}
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    Online
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-1.5 text-slate-500 text-xs">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                  <span className="line-clamp-2">{branch.location}</span>
-                </div>
-
-                <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-mono">
-                  <Cpu className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>ID: {branch.deviceId || `ESP32-${branch.id.toUpperCase()}`}</span>
-                </div>
-              </div>
-
-              <div className="pt-3 mt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">
-                  {index === 0 ? "Cabang Pusat" : `Cabang #${index + 1}`}
-                </span>
-                {branches.length > 1 && index !== 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteBranch(branch.id, branch.name)}
-                    className="text-red-500 hover:text-red-700 p-1 transition-colors"
-                    title="Hapus Cabang"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        </form>
+      )}
 
       <AddBranchModal
         isOpen={isAddBranchOpen}

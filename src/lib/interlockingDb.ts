@@ -1,6 +1,7 @@
 import { Branch, InterlockingProduct, InterlockingTransaction, FraudAlert, ShiftClosing, DEFAULT_BRANCHES } from "@/types/branch"
 import { supabase } from "@/lib/supabaseClient"
 import { sendTelegramAlert } from "@/lib/telegram"
+import { upsertCustomer } from "@/lib/crmDb"
 
 // Dynamic runtime branches (starts with 1 initial branch from DEFAULT_BRANCHES, expandable)
 let runtimeBranches: Branch[] = [...DEFAULT_BRANCHES]
@@ -97,26 +98,14 @@ export async function deleteBranch(id: string): Promise<boolean> {
 
 // In-memory / persistent runtime store for fast reactivity & offline-first capability
 let runtimeProducts: InterlockingProduct[] = [
-  // 1. NITROGEN SERVICES
+  // 1. LAYANAN NITROGEN (IoT Trigger - Motor & Mobil)
   {
-    id: "nitro-motor-tambah",
-    category: "NITROGEN",
-    vehicleType: "MOTOR",
-    serviceType: "TAMBAH",
-    name: "Tambah Angin Motor",
-    price: 5000,
-    costPrice: 500,
-    stock: 9999,
-    timerSeconds: 15,
-    requiresPhoto: true,
-    isActive: true,
-  },
-  {
-    id: "nitro-motor-full",
+    id: "nitro-motor-baru",
     category: "NITROGEN",
     vehicleType: "MOTOR",
     serviceType: "FULL",
-    name: "Isi Angin Full Motor",
+    variant: "ISI_BARU",
+    name: "Nitrogen Motor - Isi Baru",
     price: 10000,
     costPrice: 1000,
     stock: 9999,
@@ -125,11 +114,54 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
+    id: "nitro-motor-tambah",
+    category: "NITROGEN",
+    vehicleType: "MOTOR",
+    serviceType: "TAMBAH",
+    variant: "ISI_TAMBAH",
+    name: "Nitrogen Motor - Isi Tambah",
+    price: 5000,
+    costPrice: 500,
+    stock: 9999,
+    timerSeconds: 15,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "nitro-motor-tambal",
+    category: "NITROGEN",
+    vehicleType: "MOTOR",
+    serviceType: "TAMBAL",
+    variant: "TAMBAL_BAN",
+    name: "Tambal Ban Tubeless Motor",
+    price: 15000,
+    costPrice: 3000,
+    stock: 9999,
+    timerSeconds: 45,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "nitro-mobil-baru",
+    category: "NITROGEN",
+    vehicleType: "MOBIL",
+    serviceType: "FULL",
+    variant: "ISI_BARU",
+    name: "Nitrogen Mobil - Isi Baru (4 Roda)",
+    price: 25000,
+    costPrice: 2500,
+    stock: 9999,
+    timerSeconds: 90,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
     id: "nitro-mobil-tambah",
     category: "NITROGEN",
     vehicleType: "MOBIL",
     serviceType: "TAMBAH",
-    name: "Tambah Angin Mobil",
+    variant: "ISI_TAMBAH",
+    name: "Nitrogen Mobil - Isi Tambah",
     price: 10000,
     costPrice: 1000,
     stock: 9999,
@@ -138,25 +170,28 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
-    id: "nitro-mobil-full",
+    id: "nitro-mobil-tambal",
     category: "NITROGEN",
     vehicleType: "MOBIL",
-    serviceType: "FULL",
-    name: "Isi Angin Full Mobil",
-    price: 25000,
-    costPrice: 2500,
+    serviceType: "TAMBAL",
+    variant: "TAMBAL_BAN",
+    name: "Tambal Ban Tubeless Mobil",
+    price: 35000,
+    costPrice: 6000,
     stock: 9999,
-    timerSeconds: 90,
+    timerSeconds: 120,
     requiresPhoto: true,
     isActive: true,
   },
-  // 2. RETAIL & OLI
+
+  // 2. LAYANAN LAINNYA (Digital Stock-Lock: Ganti Oli, Minyak Rem, Cairan Tubles)
   {
-    id: "retail-mpx2",
-    category: "RETAIL",
-    vehicleType: null,
+    id: "layanan-oli-mpx2",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: "MOTOR",
     serviceType: null,
-    name: "Oli AHM MPX2 Matic 0.8L",
+    variant: "GANTI_OLI",
+    name: "Ganti Oli AHM MPX2 Matic 0.8L",
     price: 52000,
     costPrice: 42000,
     stock: 35,
@@ -166,11 +201,12 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
-    id: "retail-shell-ax7",
-    category: "RETAIL",
-    vehicleType: null,
+    id: "layanan-oli-shell",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: "MOTOR",
     serviceType: null,
-    name: "Oli Shell Advance AX7 10W-40 0.8L",
+    variant: "GANTI_OLI",
+    name: "Ganti Oli Shell Advance AX7 0.8L",
     price: 65000,
     costPrice: 53000,
     stock: 20,
@@ -180,11 +216,12 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
-    id: "retail-yamalube",
-    category: "RETAIL",
-    vehicleType: null,
+    id: "layanan-oli-yamalube",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: "MOTOR",
     serviceType: null,
-    name: "Oli Yamalube Silver 0.8L",
+    variant: "GANTI_OLI",
+    name: "Ganti Oli Yamalube Silver 0.8L",
     price: 48000,
     costPrice: 39000,
     stock: 15,
@@ -194,11 +231,12 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
-    id: "retail-enduro",
-    category: "RETAIL",
-    vehicleType: null,
+    id: "layanan-oli-enduro",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: "MOTOR",
     serviceType: null,
-    name: "Pertamina Enduro 4T Racing 1L",
+    variant: "GANTI_OLI",
+    name: "Ganti Oli Enduro 4T Racing 1L",
     price: 58000,
     costPrice: 47000,
     stock: 18,
@@ -208,25 +246,12 @@ let runtimeProducts: InterlockingProduct[] = [
     isActive: true,
   },
   {
-    id: "retail-castrol-power1",
-    category: "RETAIL",
-    vehicleType: null,
+    id: "layanan-oli-motul",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: "MOTOR",
     serviceType: null,
-    name: "Castrol Power 1 10W-40 0.8L",
-    price: 62000,
-    costPrice: 50000,
-    stock: 12,
-    barcode: "8999901005",
-    timerSeconds: 0,
-    requiresPhoto: true,
-    isActive: true,
-  },
-  {
-    id: "retail-motul-scooter",
-    category: "RETAIL",
-    vehicleType: null,
-    serviceType: null,
-    name: "Motul Scooter Expert LE 10W-30 0.8L",
+    variant: "GANTI_OLI",
+    name: "Ganti Oli Motul Scooter LE 0.8L",
     price: 75000,
     costPrice: 61000,
     stock: 10,
@@ -235,20 +260,218 @@ let runtimeProducts: InterlockingProduct[] = [
     requiresPhoto: true,
     isActive: true,
   },
+  {
+    id: "layanan-minyak-rem-dot3",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: null,
+    serviceType: null,
+    variant: "MINYAK_REM",
+    name: "Kuras & Ganti Minyak Rem DOT 3 (300ml)",
+    price: 35000,
+    costPrice: 25000,
+    stock: 25,
+    barcode: "8999901010",
+    timerSeconds: 0,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "layanan-minyak-rem-dot4",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: null,
+    serviceType: null,
+    variant: "MINYAK_REM",
+    name: "Kuras & Ganti Minyak Rem DOT 4 (300ml)",
+    price: 45000,
+    costPrice: 32000,
+    stock: 15,
+    barcode: "8999901011",
+    timerSeconds: 0,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "layanan-cairan-tubles-350",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: null,
+    serviceType: null,
+    variant: "TUBLES",
+    name: "Isi Cairan Ban Tubeless M-One 350ml",
+    price: 38000,
+    costPrice: 26000,
+    stock: 40,
+    barcode: "8999901020",
+    timerSeconds: 0,
+    requiresPhoto: true,
+    isActive: true,
+  },
+  {
+    id: "layanan-cairan-tubles-500",
+    category: "LAYANAN_LAINNYA",
+    vehicleType: null,
+    serviceType: null,
+    variant: "TUBLES",
+    name: "Isi Cairan Ban Tubeless IML 500ml",
+    price: 48000,
+    costPrice: 33000,
+    stock: 30,
+    barcode: "8999901021",
+    timerSeconds: 0,
+    requiresPhoto: true,
+    isActive: true,
+  },
 ]
 
-let runtimeTransactions: InterlockingTransaction[] = []
+let runtimeTransactions: InterlockingTransaction[] = [
+  // Transaksi Live Hari Ini (Sesuai Gambar 2)
+  {
+    id: "TX-TAMBUN-1024",
+    branchId: "branch-utama",
+    branchName: "Cabang Tambun",
+    cashierName: "Budi Santoso",
+    totalAmount: 10000,
+    totalCostPrice: 1000,
+    grossProfit: 9000,
+    customerPlate: "B 2345 KZ",
+    customerName: "Pak Bambang",
+    customerPhone: "081234567890",
+    vehiclePhotoUrl: "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80",
+    usedBottlePhotoUrl: null,
+    status: "COMPLETED",
+    paymentMethod: "CASH",
+    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(), // 35 menit lalu
+    items: [
+      { productId: "nitro-motor-baru", productName: "Nitrogen Motor - Isi Baru", category: "NITROGEN", quantity: 1, price: 10000, costPrice: 1000, subtotal: 10000 }
+    ]
+  },
+  {
+    id: "TX-CIBITUNG1-1018",
+    branchId: "branch-cibitung-1",
+    branchName: "Cabang Cibitung 1",
+    cashierName: "Rian Hidayat",
+    totalAmount: 65000,
+    totalCostPrice: 53000,
+    grossProfit: 12000,
+    customerPlate: "B 4567 TBD",
+    customerName: "Mas Dimas",
+    customerPhone: "085712345678",
+    vehiclePhotoUrl: null,
+    usedBottlePhotoUrl: "https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80",
+    status: "COMPLETED",
+    paymentMethod: "QRIS",
+    createdAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(), // 42 menit lalu
+    items: [
+      { productId: "layanan-oli-shell", productName: "Ganti Oli Shell Advance AX7 0.8L", category: "LAYANAN_LAINNYA", quantity: 1, price: 65000, costPrice: 53000, subtotal: 65000 }
+    ]
+  },
+  {
+    id: "TX-CIBITUNG2-1012",
+    branchId: "branch-cibitung-2",
+    branchName: "Cabang Cibitung 2",
+    cashierName: "Doni Pratama",
+    totalAmount: 25000,
+    totalCostPrice: 2500,
+    grossProfit: 22500,
+    customerPlate: "B 6789 TY",
+    customerName: "Ibu Ratna",
+    customerPhone: "087890123456",
+    vehiclePhotoUrl: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80",
+    usedBottlePhotoUrl: null,
+    status: "COMPLETED",
+    paymentMethod: "CASH",
+    createdAt: new Date(Date.now() - 1000 * 60 * 48).toISOString(), // 48 menit lalu
+    items: [
+      { productId: "nitro-mobil-baru", productName: "Nitrogen Mobil - Isi Baru (4 Roda)", category: "NITROGEN", quantity: 1, price: 25000, costPrice: 2500, subtotal: 25000 }
+    ]
+  },
+  {
+    id: "TX-CIBITUNG3-0955",
+    branchId: "branch-cibitung-3",
+    branchName: "Cabang Cibitung 3",
+    cashierName: "Andi Saputra",
+    totalAmount: 52000,
+    totalCostPrice: 42000,
+    grossProfit: 10000,
+    customerPlate: "B 9981 SAA",
+    customerName: "Pak Hendra",
+    customerPhone: "081398765432",
+    vehiclePhotoUrl: null,
+    usedBottlePhotoUrl: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=600&q=80",
+    status: "COMPLETED",
+    paymentMethod: "TRANSFER",
+    createdAt: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
+    items: [
+      { productId: "layanan-oli-mpx2", productName: "Ganti Oli AHM MPX2 Matic 0.8L", category: "LAYANAN_LAINNYA", quantity: 1, price: 52000, costPrice: 42000, subtotal: 52000 }
+    ]
+  },
+  // Data histori transaksi 30 hari untuk analisis penjualan & sistem reward
+  ...Array.from({ length: 29 }).map((_, idx) => {
+    const dayAgo = idx + 1
+    const branches = ["branch-utama", "branch-cibitung-1", "branch-cibitung-2", "branch-cibitung-3"]
+    const branchNames = ["Cabang Tambun", "Cabang Cibitung 1", "Cabang Cibitung 2", "Cabang Cibitung 3"]
+    const bIdx = idx % 4
+    const amount = 2600000 + (Math.sin(idx) * 400000) // Variasi omzet harian ~2.6jt - 3jt (rata-rata di atas target 2.5jt)
+    return {
+      id: `TX-HIST-${dayAgo}`,
+      branchId: branches[bIdx],
+      branchName: branchNames[bIdx],
+      cashierName: "Petugas Shift",
+      totalAmount: Math.round(amount),
+      totalCostPrice: Math.round(amount * 0.35),
+      grossProfit: Math.round(amount * 0.65),
+      customerPlate: `B ${1000 + idx} XYZ`,
+      customerName: `Pelanggan #${idx + 1}`,
+      customerPhone: `0812345678${(idx % 90).toString().padStart(2, "0")}`,
+      vehiclePhotoUrl: null,
+      usedBottlePhotoUrl: null,
+      status: "COMPLETED" as const,
+      paymentMethod: idx % 2 === 0 ? "CASH" : "QRIS",
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * dayAgo).toISOString(),
+      items: [
+        { productId: "nitro-motor-tambah", productName: "Nitrogen Motor - Isi Tambah", category: "NITROGEN" as const, quantity: 20, price: 5000, costPrice: 500, subtotal: 100000 },
+        { productId: "layanan-oli-shell", productName: "Ganti Oli Shell Advance AX7 0.8L", category: "LAYANAN_LAINNYA" as const, quantity: 38, price: 65000, costPrice: 53000, subtotal: 2470000 }
+      ]
+    }
+  })
+]
 
 let runtimeFraudAlerts: FraudAlert[] = [
   {
-    id: "alert-demo-1",
+    id: "alert-1",
     branchId: "branch-utama",
-    branchName: "Cabang Utama",
-    deviceId: "ESP32-NITRO-01",
+    branchName: "Cabang Tambun",
+    deviceId: "ESP32-TAMBUN",
+    alertType: "COMPRESSOR_OFF_HOURS",
+    message: "Potensi Fraud - Kompresor Aktif",
+    detectedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(), // 10:42
+  },
+  {
+    id: "alert-2",
+    branchId: "branch-cibitung-1",
+    branchName: "Cabang Cibitung 1",
+    deviceId: "ESP32-CIBITUNG-1",
     alertType: "UNAUTHORIZED_FLOW",
-    message: "Flow sensor mendeteksi aliran gas nitrogen 22 PSI selama 8 detik tanpa ada transaksi POS tercatat!",
-    detectedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  }
+    message: "Pengisian Tanpa Transaksi POS",
+    detectedAt: new Date(Date.now() - 1000 * 60 * 105).toISOString(), // 09:37
+  },
+  {
+    id: "alert-3",
+    branchId: "branch-cibitung-3",
+    branchName: "Cabang Cibitung 3",
+    deviceId: "ESP32-CIBITUNG-3",
+    alertType: "DISCREPANCY",
+    message: "Selisih Setoran Karyawan",
+    detectedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(), // 08:21
+  },
+  {
+    id: "alert-4",
+    branchId: "branch-cibitung-2",
+    branchName: "Cabang Cibitung 2",
+    deviceId: "ESP32-CIBITUNG-2",
+    alertType: "COMPRESSOR_OFF_HOURS",
+    message: "Kompresor Aktif di Luar Jam Operasional",
+    detectedAt: new Date(Date.now() - 1000 * 60 * 60 * 9).toISOString(), // 02:15
+  },
 ]
 let runtimeShiftClosings: ShiftClosing[] = []
 
@@ -349,13 +572,16 @@ export async function recordTransaction(payload: {
   paymentMethod: string
   vehiclePhotoUrl?: string | null
   usedBottlePhotoUrl?: string | null
+  customerPlate?: string | null
+  customerName?: string | null
+  customerPhone?: string | null
 }): Promise<InterlockingTransaction> {
   const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
-  // Deduct retail stock
+  // Deduct retail / service stock
   for (const item of payload.items) {
     const product = runtimeProducts.find(p => p.id === item.productId)
-    if (product && product.category === "RETAIL") {
+    if (product && (product.category === "RETAIL" || product.category === "LAYANAN_LAINNYA")) {
       product.stock = Math.max(0, product.stock - item.quantity)
     }
   }
@@ -387,6 +613,9 @@ export async function recordTransaction(payload: {
     grossProfit,
     vehiclePhotoUrl: payload.vehiclePhotoUrl || null,
     usedBottlePhotoUrl: payload.usedBottlePhotoUrl || null,
+    customerPlate: payload.customerPlate || null,
+    customerName: payload.customerName || null,
+    customerPhone: payload.customerPhone || null,
     status: "COMPLETED",
     paymentMethod: payload.paymentMethod || "CASH",
     createdAt: new Date().toISOString(),
@@ -394,6 +623,22 @@ export async function recordTransaction(payload: {
   }
 
   runtimeTransactions.unshift(tx)
+
+  // Auto-sync customer to CRM
+  if (payload.customerPlate) {
+    const serviceSummary = transactionItems.map(i => i.productName).join(", ")
+    const isMobil = transactionItems.some(i => i.productName.toLowerCase().includes("mobil"))
+    upsertCustomer({
+      name: payload.customerName || `Pelanggan ${payload.customerPlate}`,
+      phone: payload.customerPhone || "-",
+      plateNumber: payload.customerPlate,
+      vehicleType: isMobil ? "MOBIL" : "MOTOR",
+      serviceType: serviceSummary,
+      branchId: payload.branchId,
+      branchName: branch.name,
+      amount: payload.totalAmount,
+    }).catch(console.error)
+  }
 
   try {
     await supabase.from("transactions").insert({

@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
       totalAmount,
       paymentMethod,
       vehiclePhotoUrl,
-      usedBottlePhotoUrl
+      usedBottlePhotoUrl,
+      customerPlate,
+      customerName,
+      customerPhone,
     } = body
 
     if (!branchId || !items || items.length === 0) {
@@ -27,7 +30,10 @@ export async function POST(req: NextRequest) {
       totalAmount,
       paymentMethod: paymentMethod || "CASH",
       vehiclePhotoUrl,
-      usedBottlePhotoUrl
+      usedBottlePhotoUrl,
+      customerPlate,
+      customerName,
+      customerPhone,
     })
 
     return NextResponse.json({ success: true, transaction: tx })

@@ -19,6 +19,7 @@ import {
   LogOut,
   Store,
   Settings,
+  ShieldCheck,
 } from "lucide-react"
 
 const navGroups = [
@@ -34,15 +35,17 @@ const navGroups = [
       { label: "Kasir POS", href: "/kasir", icon: Receipt },
       { label: "Tutup Shift", href: "/shift-closing", icon: Lock },
       { label: "Riwayat", href: "/riwayat", icon: History },
+      { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck },
     ]
   },
   {
     label: "Kelola & Stok",
     items: [
       { label: "Katalog & Timer", href: "/katalog", icon: Package },
+      { label: "Pelanggan & CRM", href: "/crm", icon: Users },
       { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign },
       { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users },
-      { label: "Pengaturan Toko", href: "/pengaturan/toko", icon: Store },
+      { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store },
     ]
   },
   {

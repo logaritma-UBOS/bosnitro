@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useBranch } from "@/context/BranchContext"
-import { InterlockingTransaction, FraudAlert } from "@/types/branch"
+import { InterlockingTransaction, FraudAlert, Analytics30Days } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
 import BranchSelector from "@/components/branch/BranchSelector"
 import Link from "next/link"
@@ -23,6 +23,15 @@ import {
   X,
   Copy,
   MessageCircle,
+  Trophy,
+  Award,
+  Sparkles,
+  Building2,
+  Radio,
+  Clock,
+  Check,
+  ChevronRight,
+  Flame,
 } from "lucide-react"
 
 export default function OwnerDashboardInterlockingClient({
@@ -39,7 +48,11 @@ export default function OwnerDashboardInterlockingClient({
   const [alerts] = useState<FraudAlert[]>(initialAlerts)
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
 
-  // Dynamic Telegram phone number from user account & store settings
+  // 30-Day Analytics & Reward State
+  const [analytics30Days, setAnalytics30Days] = useState<Analytics30Days | null>(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+
+  // Dynamic Telegram info
   const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "083153598697")
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null)
 
@@ -51,7 +64,16 @@ export default function OwnerDashboardInterlockingClient({
         if (data.telegramChatId) setTelegramChatId(data.telegramChatId)
       })
       .catch(() => {})
-  }, [])
+
+    // Load 30-day analytics & reward status
+    fetch(`/api/analytics/30-days?branchId=${isAllBranches ? "ALL" : selectedBranchId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.data) setAnalytics30Days(data.data)
+        setLoadingAnalytics(false)
+      })
+      .catch(() => setLoadingAnalytics(false))
+  }, [selectedBranchId, isAllBranches])
 
   // Telegram report state
   const [sendingTelegram, setSendingTelegram] = useState(false)
@@ -117,8 +139,31 @@ export default function OwnerDashboardInterlockingClient({
   }, [filteredTransactions])
 
   const validTxCount = filteredTransactions.length
-
   const branchLabel = isAllBranches ? `Seluruh ${branches.length} Cabang` : selectedBranch.name
+
+  // Multi-branch stats (Image 2: Cards for 4 branches)
+  const branchCardsData = useMemo(() => {
+    return branches.map((b) => {
+      const bTrx = transactions.filter((t) => t.branchId === b.id)
+      const bRev = bTrx.reduce((acc, t) => acc + t.totalAmount, 0)
+      let bNitrogen = 0
+      let bOli = 0
+      bTrx.forEach((t) => {
+        t.items.forEach((it) => {
+          if (it.category === "NITROGEN") bNitrogen += it.quantity
+          else bOli += it.quantity
+        })
+      })
+
+      return {
+        branch: b,
+        revenue: bRev,
+        nitrogenCount: bNitrogen,
+        oliCount: bOli,
+        txCount: bTrx.length,
+      }
+    })
+  }, [branches, transactions])
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 font-sans">
@@ -130,11 +175,11 @@ export default function OwnerDashboardInterlockingClient({
               <BarChart3 className="w-5 h-5" />
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-              Dashboard Anti-Loss 
+              Dashboard Eksekutif Anti-Loss
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
-            Monitoring omzet real-time, audit visual plat nomor & botol oli, serta deteksi kebocoran sensor IoT
+            Monitoring live feed 4 cabang, evaluasi target 30 hari & sistem reward, interlocking IoT & audit visual
           </p>
         </div>
 
@@ -146,7 +191,7 @@ export default function OwnerDashboardInterlockingClient({
             className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
-            <span>{sendingTelegram ? "Menyiapkan..." : `Kirim Laporan ke Telegram (${telegramPhone})`}</span>
+            <span>{sendingTelegram ? "Menyiapkan..." : `Kirim Laporan Telegram (${telegramPhone})`}</span>
           </button>
           <div className="w-full sm:w-64">
             <BranchSelector allowAll={true} />
@@ -206,6 +251,181 @@ export default function OwnerDashboardInterlockingClient({
         </div>
       )}
 
+      {/* REQUIREMENT #4: ANALISIS PENJUALAN 30 HARI & SISTEM REWARD WIDGET */}
+      {analytics30Days && (
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-700 space-y-6 relative overflow-hidden">
+          {/* Ambient Glow */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex items-center justify-center">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-black tracking-tight">
+                    Analisis Penjualan 30 Hari & Evaluasi Reward
+                  </h2>
+                  <span className="bg-yellow-400/20 text-yellow-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-yellow-400/30">
+                    Sistem Reward Aktif
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  Target harian ditetapkan Owner: <strong className="text-white">{formatRupiah(analytics30Days.targetDailyOmzet || 0)}</strong> / hari
+                </p>
+              </div>
+            </div>
+
+            {/* Reward Status Celebration Badge */}
+            {analytics30Days.isRewardUnlocked ? (
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-2.5 rounded-2xl font-black text-xs flex items-center gap-2.5 shadow-lg shadow-emerald-500/25 animate-bounce">
+                <Award className="w-5 h-5 text-yellow-200" />
+                <div>
+                  <div className="leading-tight">TARGET TERCAPAI!</div>
+                  <div className="text-[10px] font-semibold text-emerald-100">
+                    Bonus Reward: {formatRupiah(analytics30Days.rewardBonusPool || 0)}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-800 text-slate-300 px-4 py-2 rounded-2xl text-xs font-bold border border-slate-700 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <span>Mengejar Target ({analytics30Days.achievementPercentage}%)</span>
+              </div>
+            )}
+          </div>
+
+          {/* 30-Day Metrics Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Omzet (30 Hari)</span>
+              <p className="text-xl sm:text-2xl font-black text-emerald-400 tabular-nums mt-1">
+                {formatRupiah(analytics30Days.totalOmzet30Days || 0)}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {analytics30Days.totalTransactions30Days} Total Transaksi
+              </p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Rata-Rata Omzet / Hari</span>
+              <p className="text-xl sm:text-2xl font-black text-yellow-300 tabular-nums mt-1">
+                {formatRupiah(analytics30Days.actualDailyAverage)}
+              </p>
+              <p className="text-[10px] text-emerald-300 mt-1 font-bold">
+                {analytics30Days.actualDailyAverage >= (analytics30Days.targetDailyOmzet || 0) ? "▲ Melebihi Target" : "▼ Di Bawah Target"}
+              </p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Target Harian Owner</span>
+              <p className="text-xl sm:text-2xl font-black text-slate-200 tabular-nums mt-1">
+                {formatRupiah(analytics30Days.targetDailyOmzet || 0)}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Pencapaian: <strong className="text-yellow-300">{analytics30Days.achievementPercentage}%</strong>
+              </p>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Hari Target Tercapai</span>
+              <p className="text-xl sm:text-2xl font-black text-cyan-300 tabular-nums mt-1">
+                {analytics30Days.daysTargetAchieved || 0} / 30 Hari
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Konsistensi: {Math.round(((analytics30Days.daysTargetAchieved || 0) / 30) * 100)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Bar towards target */}
+          <div className="space-y-1.5 relative z-10">
+            <div className="flex justify-between text-xs font-bold">
+              <span className="text-slate-300">Kemajuan Rata-Rata Penjualan vs Target</span>
+              <span className="text-yellow-300">{analytics30Days.achievementPercentage}%</span>
+            </div>
+            <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden p-0.5">
+              <div
+                className="bg-gradient-to-r from-yellow-400 to-emerald-400 h-full rounded-full transition-all duration-1000"
+                style={{ width: `${Math.min(100, analytics30Days.achievementPercentage)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MULTI-BRANCH OVERVIEW CARDS (Image 2 Blueprint: 4 Cabang) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900">
+                Live Feed Seluruh Cabang ({branches.length} Outlet Aktif)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Performa harian per outlet sesuai arsitektur Image 2
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {branchCardsData.map((bItem, idx) => (
+            <div
+              key={bItem.branch.id}
+              className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 hover:shadow-md transition-all"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="text-sm font-extrabold text-slate-900 truncate">
+                      {bItem.branch.name}
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                    Online
+                  </span>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Omzet Riil</span>
+                    <p className="text-xl font-black text-slate-900 tabular-nums">
+                      {formatRupiah(bItem.revenue)}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                    <div>
+                      <span className="text-slate-400 text-[10px]">Trx Nitrogen</span>
+                      <p className="font-bold text-emerald-700">{bItem.nitrogenCount} ban</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px]">Unit Oli</span>
+                      <p className="font-bold text-blue-700">{bItem.oliCount} botol</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span className="font-mono text-[10px] text-slate-400">
+                  {bItem.branch.deviceId || `ESP32-${idx + 1}`}
+                </span>
+                <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg text-[10px]">
+                  Valve Ready
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Omzet */}
@@ -243,7 +463,7 @@ export default function OwnerDashboardInterlockingClient({
               {formatRupiah(totalGrossProfit)}
             </p>
             <p className="text-[11px] text-slate-400 font-medium mt-1">
-              Margin Rata-rata: {totalRevenue > 0 ? Math.round((totalGrossProfit / totalRevenue) * 100) : 0}%
+              Margin: {totalRevenue > 0 ? Math.round((totalGrossProfit / totalRevenue) * 100) : 0}%
             </p>
           </div>
         </div>
@@ -295,7 +515,7 @@ export default function OwnerDashboardInterlockingClient({
         </div>
       </div>
 
-      {/* FRAUD CONTROL & ANOMALY ALERTS WIDGET */}
+      {/* FRAUD CONTROL & ANOMALY ALERTS WIDGET (Image 2: Telegram Fraud Alert Log) */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
@@ -304,24 +524,26 @@ export default function OwnerDashboardInterlockingClient({
             </div>
             <div>
               <h2 className="text-base font-extrabold text-slate-900">
-                Peringatan Anomali Sensor Flow Meter (Anti-Loss Leak Detection)
+                Log Peringatan Fraud Telegram (Real-Time Sensor Anomaly)
               </h2>
               <p className="text-xs text-slate-500">
-                Mendeteksi penggunaan gas liar atau katup solenoid bocor tanpa transaksi tercatat di POS
+                Pemberitahuan otomatis ke bot Telegram owner saat terdeteksi anomali hardware atau selisih kasir
               </p>
             </div>
           </div>
 
-          <span className={`text-xs font-black px-3 py-1 rounded-full ${
-            filteredAlerts.length > 0 ? "bg-red-100 text-red-800 animate-pulse" : "bg-emerald-100 text-emerald-800"
-          }`}>
+          <span
+            className={`text-xs font-black px-3 py-1 rounded-full ${
+              filteredAlerts.length > 0 ? "bg-red-100 text-red-800 animate-pulse" : "bg-emerald-100 text-emerald-800"
+            }`}
+          >
             {filteredAlerts.length > 0 ? `${filteredAlerts.length} Anomali Terdeteksi` : "Aman / Normal"}
           </span>
         </div>
 
         {filteredAlerts.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-xs">
-            Tidak ada anomali sensor flow meter pada cabang ini. Sistem pengisian berjalan tertib.
+            Tidak ada anomali sensor pada cabang ini. Sistem pengisian berjalan tertib.
           </div>
         ) : (
           <div className="space-y-3">
@@ -359,7 +581,7 @@ export default function OwnerDashboardInterlockingClient({
         )}
       </div>
 
-      {/* VISUAL AUDIT GALLERY (FOTO PLAT NOMOR & FOTO BOTOL BEKAS) */}
+      {/* VISUAL AUDIT GALLERY (Image 2: Live Fraud & Audit Stream) */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
           <div>
@@ -368,11 +590,11 @@ export default function OwnerDashboardInterlockingClient({
                 <Camera className="w-4 h-4" />
               </div>
               <h2 className="text-base font-extrabold text-slate-900">
-                Galeri Visual Audit Transaksi
+                Live Audit & Foto Bukti Transaksi
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Setiap struk penjualan nitrogen diverifikasi dengan foto plat kendaraan & penjualan ritel dengan foto botol bekas
+              Setiap struk diverifikasi dengan foto plat nomor kendaraan & foto botol oli bekas yang diganti
             </p>
           </div>
 
@@ -392,7 +614,7 @@ export default function OwnerDashboardInterlockingClient({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTransactions.map((tx) => (
+            {filteredTransactions.slice(0, 9).map((tx) => (
               <div
                 key={tx.id}
                 className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-300 transition-all hover:shadow-xs"
@@ -416,7 +638,7 @@ export default function OwnerDashboardInterlockingClient({
                         onClick={() =>
                           setPreviewPhoto({
                             url: tx.vehiclePhotoUrl!,
-                            title: `Foto Plat Kendaraan (${tx.id})`,
+                            title: `Foto Plat Kendaraan (${tx.customerPlate || tx.id})`,
                           })
                         }
                         className="cursor-pointer group relative aspect-video rounded-xl overflow-hidden bg-black border border-slate-300"
@@ -428,7 +650,7 @@ export default function OwnerDashboardInterlockingClient({
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
                         <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded text-center truncate">
-                          Plat Nomor Kendaraan
+                          Plat: {tx.customerPlate || "Tercatat"}
                         </span>
                       </div>
                     ) : (
