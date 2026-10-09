@@ -48,7 +48,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
     { label: "Tutup Shift", href: "/shift-closing", icon: Lock, scope: "BRANCH_ONLY" },
     { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck, scope: "ALL_ONLY" },
     { label: "Pelanggan CRM", href: "/crm", icon: Users, scope: "BOTH" },
-    { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BOTH" },
+    { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BRANCH_ONLY" },
     { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users, scope: "BRANCH_ONLY" },
     { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BRANCH_ONLY" },
   ]

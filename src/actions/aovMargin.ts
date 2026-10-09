@@ -53,31 +53,77 @@ export async function fetchAOVMarginData(period: AOVMarginPeriodFilter) {
     }
   }
 
-  const currentSales = await prisma.sale.findMany({
-    where: { 
-      businessId: business.id, 
-      createdAt: { gte: currentStartUTC, lte: nowUTC } 
-    },
-    select: selectQuery
-  })
+  // Tarik data transaksi masuk dari seluruh cabang di interlockingDb
+  const { getTransactions } = await import("@/lib/interlockingDb")
+  const allTransactions = await getTransactions("ALL")
 
-  const previousSales = await prisma.sale.findMany({
-    where: { 
-      businessId: business.id, 
-      createdAt: { gte: prevStartUTC, lte: prevEndUTC } 
-    },
-    select: selectQuery
-  })
+  const liveCurrentSales = allTransactions
+    .filter(t => {
+      const d = new Date(t.createdAt)
+      return d >= currentStartUTC && d <= nowUTC && t.status === "COMPLETED"
+    })
+    .map(t => ({
+      id: t.id,
+      createdAt: new Date(t.createdAt),
+      totalAmount: t.totalAmount,
+      saleItems: t.items.map(it => ({
+        productId: it.productId,
+        product: { name: it.productName },
+        quantity: it.quantity,
+        priceAtSale: it.price,
+        hppAtSale: it.costPrice || 0
+      }))
+    }))
+
+  const livePrevSales = allTransactions
+    .filter(t => {
+      const d = new Date(t.createdAt)
+      return d >= prevStartUTC && d <= prevEndUTC && t.status === "COMPLETED"
+    })
+    .map(t => ({
+      id: t.id,
+      createdAt: new Date(t.createdAt),
+      totalAmount: t.totalAmount,
+      saleItems: t.items.map(it => ({
+        productId: it.productId,
+        product: { name: it.productName },
+        quantity: it.quantity,
+        priceAtSale: it.price,
+        hppAtSale: it.costPrice || 0
+      }))
+    }))
+
+  let dbCurrentSales: any[] = []
+  let dbPrevSales: any[] = []
+  try {
+    dbCurrentSales = await prisma.sale.findMany({
+      where: { 
+        businessId: business.id, 
+        createdAt: { gte: currentStartUTC, lte: nowUTC } 
+      },
+      select: selectQuery
+    })
+    dbPrevSales = await prisma.sale.findMany({
+      where: { 
+        businessId: business.id, 
+        createdAt: { gte: prevStartUTC, lte: prevEndUTC } 
+      },
+      select: selectQuery
+    })
+  } catch (e) {}
+
+  const mergedCurrentSales = [...dbCurrentSales, ...liveCurrentSales]
+  const mergedPreviousSales = [...dbPrevSales, ...livePrevSales]
 
   const { calculateAOVMarginAnalysis } = await import("@/lib/engines/aovMarginEngine")
-  const aovResult = calculateAOVMarginAnalysis(currentSales as any, previousSales as any, activeDays)
+  const aovResult = calculateAOVMarginAnalysis(mergedCurrentSales as any, mergedPreviousSales as any, activeDays)
 
   return { 
     success: true, 
     aovResult, 
     activeDays, 
     timezone: tz,
-    currentSalesCount: currentSales.length,
-    previousSalesCount: previousSales.length
+    currentSalesCount: mergedCurrentSales.length,
+    previousSalesCount: mergedPreviousSales.length
   }
 }

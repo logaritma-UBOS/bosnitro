@@ -35,22 +35,64 @@ export async function fetchProductPerformanceData(period: PeriodFilter) {
 
   const { prevStartUTC, prevEndUTC } = getEquivalentPreviousPeriod(tz, currentStartUTC, nowUTC, period)
 
-  // Tenant-isolated Query
-  const currentSales = await prisma.sale.findMany({
-    where: { 
-      businessId: business.id, 
-      createdAt: { gte: currentStartUTC, lte: nowUTC } 
-    },
-    include: { saleItems: { include: { product: true } } }
-  })
+  // Tarik data transaksi masuk dari seluruh cabang di interlockingDb
+  const { getTransactions } = await import("@/lib/interlockingDb")
+  const allTransactions = await getTransactions("ALL")
 
-  const previousSales = await prisma.sale.findMany({
-    where: { 
-      businessId: business.id, 
-      createdAt: { gte: prevStartUTC, lte: prevEndUTC } 
-    },
-    include: { saleItems: { include: { product: true } } }
-  })
+  const liveCurrentSales = allTransactions
+    .filter(t => {
+      const d = new Date(t.createdAt)
+      return d >= currentStartUTC && d <= nowUTC && t.status === "COMPLETED"
+    })
+    .map(t => ({
+      id: t.id,
+      saleItems: t.items.map(it => ({
+        productId: it.productId,
+        product: { name: it.productName },
+        quantity: it.quantity,
+        priceAtSale: it.price,
+        hppAtSale: it.costPrice || 0
+      }))
+    }))
+
+  const livePrevSales = allTransactions
+    .filter(t => {
+      const d = new Date(t.createdAt)
+      return d >= prevStartUTC && d <= prevEndUTC && t.status === "COMPLETED"
+    })
+    .map(t => ({
+      id: t.id,
+      saleItems: t.items.map(it => ({
+        productId: it.productId,
+        product: { name: it.productName },
+        quantity: it.quantity,
+        priceAtSale: it.price,
+        hppAtSale: it.costPrice || 0
+      }))
+    }))
+
+  // Gabungkan dengan prisma jika ada
+  let dbCurrentSales: any[] = []
+  let dbPrevSales: any[] = []
+  try {
+    dbCurrentSales = await prisma.sale.findMany({
+      where: { 
+        businessId: business.id, 
+        createdAt: { gte: currentStartUTC, lte: nowUTC } 
+      },
+      include: { saleItems: { include: { product: true } } }
+    })
+    dbPrevSales = await prisma.sale.findMany({
+      where: { 
+        businessId: business.id, 
+        createdAt: { gte: prevStartUTC, lte: prevEndUTC } 
+      },
+      include: { saleItems: { include: { product: true } } }
+    })
+  } catch (e) {}
+
+  const mergedCurrentSales = [...dbCurrentSales, ...liveCurrentSales]
+  const mergedPreviousSales = [...dbPrevSales, ...livePrevSales]
 
   // Calculate active days for velocity
   let activeDays = 1
@@ -58,7 +100,7 @@ export async function fetchProductPerformanceData(period: PeriodFilter) {
   if (period === "30_DAYS") activeDays = 30
 
   const { calculateProductPerformance } = await import("@/lib/engines/productPerformanceEngine")
-  const result = calculateProductPerformance(currentSales as any, previousSales as any, activeDays)
+  const result = calculateProductPerformance(mergedCurrentSales as any, mergedPreviousSales as any, activeDays)
 
   return { success: true, result, timezone: tz }
 }

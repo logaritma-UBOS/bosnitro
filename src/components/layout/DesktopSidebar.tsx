@@ -59,7 +59,8 @@ const navGroups: NavGroup[] = [
       // Katalog, Pegawai, Pengaturan & IoT hanya di masing-masing cabang
       { label: "Katalog & Timer", href: "/katalog", icon: Package, scope: "BRANCH_ONLY" },
       { label: "Pelanggan & CRM", href: "/crm", icon: Users, scope: "BOTH" },
-      { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BOTH" },
+      // Pengeluaran hanya di masing-masing cabang, disembunyikan di Semua Cabang
+      { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BRANCH_ONLY" },
       { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users, scope: "BRANCH_ONLY" },
       { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BRANCH_ONLY" },
     ],

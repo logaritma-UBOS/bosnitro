@@ -337,157 +337,55 @@ export function getBranchProductsList(branchId?: string): InterlockingProduct[] 
   return branchProductsMap[targetId]
 }
 
-let runtimeTransactions: InterlockingTransaction[] = [
-  // Transaksi Live Hari Ini (Sesuai Gambar 2)
-  {
-    id: "TX-TAMBUN-1024",
-    branchId: "branch-utama",
-    branchName: "Cabang Tambun",
-    cashierName: "Budi Santoso",
-    totalAmount: 10000,
-    totalCostPrice: 1000,
-    grossProfit: 9000,
-    customerPlate: "B 2345 KZ",
-    customerName: "Pak Bambang",
-    customerPhone: "081234567890",
-    vehiclePhotoUrl: "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=600&q=80",
-    usedBottlePhotoUrl: null,
-    status: "COMPLETED",
-    paymentMethod: "CASH",
-    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(), // 35 menit lalu
-    items: [
-      { productId: "nitro-motor-baru", productName: "Nitrogen Motor - Isi Baru", category: "NITROGEN", quantity: 1, price: 10000, costPrice: 1000, subtotal: 10000 }
-    ]
-  },
-  {
-    id: "TX-CIBITUNG1-1018",
-    branchId: "branch-cibitung-1",
-    branchName: "Cabang Cibitung 1",
-    cashierName: "Rian Hidayat",
-    totalAmount: 65000,
-    totalCostPrice: 53000,
-    grossProfit: 12000,
-    customerPlate: "B 4567 TBD",
-    customerName: "Mas Dimas",
-    customerPhone: "085712345678",
-    vehiclePhotoUrl: null,
-    usedBottlePhotoUrl: "https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80",
-    status: "COMPLETED",
-    paymentMethod: "QRIS",
-    createdAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(), // 42 menit lalu
-    items: [
-      { productId: "layanan-oli-shell", productName: "Ganti Oli Shell Advance AX7 0.8L", category: "LAYANAN_LAINNYA", quantity: 1, price: 65000, costPrice: 53000, subtotal: 65000 }
-    ]
-  },
-  {
-    id: "TX-CIBITUNG2-1012",
-    branchId: "branch-cibitung-2",
-    branchName: "Cabang Cibitung 2",
-    cashierName: "Doni Pratama",
-    totalAmount: 25000,
-    totalCostPrice: 2500,
-    grossProfit: 22500,
-    customerPlate: "B 6789 TY",
-    customerName: "Ibu Ratna",
-    customerPhone: "087890123456",
-    vehiclePhotoUrl: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80",
-    usedBottlePhotoUrl: null,
-    status: "COMPLETED",
-    paymentMethod: "CASH",
-    createdAt: new Date(Date.now() - 1000 * 60 * 48).toISOString(), // 48 menit lalu
-    items: [
-      { productId: "nitro-mobil-baru", productName: "Nitrogen Mobil - Isi Baru (4 Roda)", category: "NITROGEN", quantity: 1, price: 25000, costPrice: 2500, subtotal: 25000 }
-    ]
-  },
-  {
-    id: "TX-CIBITUNG3-0955",
-    branchId: "branch-cibitung-3",
-    branchName: "Cabang Cibitung 3",
-    cashierName: "Andi Saputra",
-    totalAmount: 52000,
-    totalCostPrice: 42000,
-    grossProfit: 10000,
-    customerPlate: "B 9981 SAA",
-    customerName: "Pak Hendra",
-    customerPhone: "081398765432",
-    vehiclePhotoUrl: null,
-    usedBottlePhotoUrl: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=600&q=80",
-    status: "COMPLETED",
-    paymentMethod: "TRANSFER",
-    createdAt: new Date(Date.now() - 1000 * 60 * 65).toISOString(),
-    items: [
-      { productId: "layanan-oli-mpx2", productName: "Ganti Oli AHM MPX2 Matic 0.8L", category: "LAYANAN_LAINNYA", quantity: 1, price: 52000, costPrice: 42000, subtotal: 52000 }
-    ]
-  },
-  // Data histori transaksi 30 hari untuk analisis penjualan & sistem reward
-  ...Array.from({ length: 29 }).map((_, idx) => {
-    const dayAgo = idx + 1
-    const branches = ["branch-utama", "branch-cibitung-1", "branch-cibitung-2", "branch-cibitung-3"]
-    const branchNames = ["Cabang Tambun", "Cabang Cibitung 1", "Cabang Cibitung 2", "Cabang Cibitung 3"]
-    const bIdx = idx % 4
-    const amount = 2600000 + (Math.sin(idx) * 400000) // Variasi omzet harian ~2.6jt - 3jt (rata-rata di atas target 2.5jt)
-    return {
-      id: `TX-HIST-${dayAgo}`,
-      branchId: branches[bIdx],
-      branchName: branchNames[bIdx],
-      cashierName: "Petugas Shift",
-      totalAmount: Math.round(amount),
-      totalCostPrice: Math.round(amount * 0.35),
-      grossProfit: Math.round(amount * 0.65),
-      customerPlate: `B ${1000 + idx} XYZ`,
-      customerName: `Pelanggan #${idx + 1}`,
-      customerPhone: `0812345678${(idx % 90).toString().padStart(2, "0")}`,
-      vehiclePhotoUrl: null,
-      usedBottlePhotoUrl: null,
-      status: "COMPLETED" as const,
-      paymentMethod: idx % 2 === 0 ? "CASH" : "QRIS",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * dayAgo).toISOString(),
-      items: [
-        { productId: "nitro-motor-tambah", productName: "Nitrogen Motor - Isi Tambah", category: "NITROGEN" as const, quantity: 20, price: 5000, costPrice: 500, subtotal: 100000 },
-        { productId: "layanan-oli-shell", productName: "Ganti Oli Shell Advance AX7 0.8L", category: "LAYANAN_LAINNYA" as const, quantity: 38, price: 65000, costPrice: 53000, subtotal: 2470000 }
-      ]
-    }
-  })
-]
+export type BranchExpense = {
+  id: string
+  branchId: string
+  branchName: string
+  category: string
+  amount: number
+  description: string
+  date: string
+}
 
-let runtimeFraudAlerts: FraudAlert[] = [
-  {
-    id: "alert-1",
-    branchId: "branch-utama",
-    branchName: "Cabang Tambun",
-    deviceId: "ESP32-TAMBUN",
-    alertType: "COMPRESSOR_OFF_HOURS",
-    message: "Potensi Fraud - Kompresor Aktif",
-    detectedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(), // 10:42
-  },
-  {
-    id: "alert-2",
-    branchId: "branch-cibitung-1",
-    branchName: "Cabang Cibitung 1",
-    deviceId: "ESP32-CIBITUNG-1",
-    alertType: "UNAUTHORIZED_FLOW",
-    message: "Pengisian Tanpa Transaksi POS",
-    detectedAt: new Date(Date.now() - 1000 * 60 * 105).toISOString(), // 09:37
-  },
-  {
-    id: "alert-3",
-    branchId: "branch-cibitung-3",
-    branchName: "Cabang Cibitung 3",
-    deviceId: "ESP32-CIBITUNG-3",
-    alertType: "DISCREPANCY",
-    message: "Selisih Setoran Karyawan",
-    detectedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(), // 08:21
-  },
-  {
-    id: "alert-4",
-    branchId: "branch-cibitung-2",
-    branchName: "Cabang Cibitung 2",
-    deviceId: "ESP32-CIBITUNG-2",
-    alertType: "COMPRESSOR_OFF_HOURS",
-    message: "Kompresor Aktif di Luar Jam Operasional",
-    detectedAt: new Date(Date.now() - 1000 * 60 * 60 * 9).toISOString(), // 02:15
-  },
-]
+let runtimeExpenses: BranchExpense[] = []
+
+export async function getExpenses(branchId?: string): Promise<BranchExpense[]> {
+  if (!branchId || branchId === "ALL") {
+    return runtimeExpenses
+  }
+  return runtimeExpenses.filter((e) => e.branchId === branchId)
+}
+
+export async function recordExpense(payload: {
+  branchId: string
+  category: string
+  amount: number
+  description?: string
+}): Promise<BranchExpense> {
+  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  const expense: BranchExpense = {
+    id: `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    branchId: payload.branchId,
+    branchName: branch.name,
+    category: payload.category,
+    amount: payload.amount,
+    description: payload.description || "",
+    date: new Date().toISOString(),
+  }
+  runtimeExpenses.unshift(expense)
+  return expense
+}
+
+export async function deleteBranchExpense(id: string): Promise<boolean> {
+  runtimeExpenses = runtimeExpenses.filter((e) => e.id !== id)
+  return true
+}
+
+// Reset all runtime transactions to 0 from the start (Requirement 2)
+let runtimeTransactions: InterlockingTransaction[] = []
+
+// Reset all runtime fraud alerts to 0 from the start
+let runtimeFraudAlerts: FraudAlert[] = []
 let runtimeShiftClosings: ShiftClosing[] = []
 
 export async function getProducts(branchId?: string): Promise<InterlockingProduct[]> {
