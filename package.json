@@ -4,7 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack",
-        "build": "prisma generate && node run_turso_mig.js && next build",
+        "build": "prisma generate && node -e \"if(require('fs').existsSync('./run_turso_mig.js')) require('./run_turso_mig.js');\" && next build",
         "start": "next start",
         "lint": "eslint",
         "postinstall": "prisma generate"
