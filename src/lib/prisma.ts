@@ -16,18 +16,12 @@ function getDatabaseConfig() {
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     const tmpDbPath = '/tmp/dev.db'
     if (!fs.existsSync(tmpDbPath)) {
-      const candidates = [
-        path.join(process.cwd(), 'dev.db'),
-        path.resolve('dev.db'),
-      ]
-      for (const p of candidates) {
-        if (fs.existsSync(p)) {
-          try {
-            fs.copyFileSync(p, tmpDbPath)
-            break
-          } catch (e) {
-            console.warn('Failed to copy candidate to /tmp:', p, e)
-          }
+      const srcDbPath = path.resolve('./dev.db')
+      if (fs.existsSync(srcDbPath)) {
+        try {
+          fs.copyFileSync(srcDbPath, tmpDbPath)
+        } catch (e) {
+          console.warn('Failed to copy dev.db to /tmp:', e)
         }
       }
     }
