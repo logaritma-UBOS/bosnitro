@@ -8,10 +8,11 @@ let runtimeBranches: Branch[] = [...DEFAULT_BRANCHES]
 
 // Dynamic runtime store settings
 let runtimeStoreSettings = {
-  storeName: "Toko meruvin",
+  storeName: "MERUVIN",
   profileImage: null as string | null,
   telegramPhone: "083153598697",
-  telegramChatId: null as string | null,
+  telegramChatId: "-5332437584" as string | null,
+  telegramBotToken: null as string | null,
 }
 
 export async function getStoreSettings(): Promise<{
@@ -19,7 +20,25 @@ export async function getStoreSettings(): Promise<{
   profileImage: string | null
   telegramPhone: string
   telegramChatId: string | null
+  telegramBotToken: string | null
 }> {
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const settings = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: ["store_name", "store_telegram_phone", "store_telegram_chat_id", "store_telegram_bot_token", "store_profile_image"]
+        }
+      }
+    })
+    const map = Object.fromEntries(settings.map(s => [s.key, s.value]))
+    if (map["store_name"]) runtimeStoreSettings.storeName = map["store_name"]
+    if (map["store_telegram_phone"]) runtimeStoreSettings.telegramPhone = map["store_telegram_phone"]
+    if (map["store_telegram_chat_id"]) runtimeStoreSettings.telegramChatId = map["store_telegram_chat_id"]
+    if (map["store_telegram_bot_token"]) runtimeStoreSettings.telegramBotToken = map["store_telegram_bot_token"]
+    if (map["store_profile_image"]) runtimeStoreSettings.profileImage = map["store_profile_image"]
+  } catch (e) {}
+
   return runtimeStoreSettings
 }
 
@@ -28,11 +47,56 @@ export async function updateStoreSettings(data: {
   profileImage?: string | null
   telegramPhone?: string
   telegramChatId?: string | null
+  telegramBotToken?: string | null
 }) {
   if (data.storeName !== undefined && data.storeName.trim()) runtimeStoreSettings.storeName = data.storeName.trim()
   if (data.profileImage !== undefined) runtimeStoreSettings.profileImage = data.profileImage
   if (data.telegramPhone !== undefined && data.telegramPhone.trim()) runtimeStoreSettings.telegramPhone = data.telegramPhone.trim()
   if (data.telegramChatId !== undefined) runtimeStoreSettings.telegramChatId = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : null
+  if (data.telegramBotToken !== undefined) runtimeStoreSettings.telegramBotToken = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : null
+
+  // Persist directly to Prisma SystemSetting
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    if (data.storeName && data.storeName.trim()) {
+      await prisma.systemSetting.upsert({
+        where: { key: "store_name" },
+        update: { value: data.storeName.trim() },
+        create: { id: "sys-store-name", key: "store_name", value: data.storeName.trim() }
+      })
+    }
+    if (data.telegramPhone && data.telegramPhone.trim()) {
+      await prisma.systemSetting.upsert({
+        where: { key: "store_telegram_phone" },
+        update: { value: data.telegramPhone.trim() },
+        create: { id: "sys-store-phone", key: "store_telegram_phone", value: data.telegramPhone.trim() }
+      })
+    }
+    if (data.telegramChatId !== undefined) {
+      const val = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : ""
+      await prisma.systemSetting.upsert({
+        where: { key: "store_telegram_chat_id" },
+        update: { value: val },
+        create: { id: "sys-store-chat-id", key: "store_telegram_chat_id", value: val }
+      })
+    }
+    if (data.telegramBotToken !== undefined) {
+      const val = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : ""
+      await prisma.systemSetting.upsert({
+        where: { key: "store_telegram_bot_token" },
+        update: { value: val },
+        create: { id: "sys-store-bot-token", key: "store_telegram_bot_token", value: val }
+      })
+    }
+    if (data.profileImage !== undefined && data.profileImage) {
+      await prisma.systemSetting.upsert({
+        where: { key: "store_profile_image" },
+        update: { value: data.profileImage },
+        create: { id: "sys-store-profile-image", key: "store_profile_image", value: data.profileImage }
+      })
+    }
+  } catch (e) {}
+
   return runtimeStoreSettings
 }
 

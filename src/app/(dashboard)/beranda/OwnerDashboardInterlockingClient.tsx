@@ -64,14 +64,36 @@ export default function OwnerDashboardInterlockingClient({
 
   // Dynamic Telegram info
   const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "083153598697")
-  const [telegramChatId, setTelegramChatId] = useState<string | null>(null)
+  const [telegramChatId, setTelegramChatId] = useState<string | null>("-5332437584")
+  const [telegramBotToken, setTelegramBotToken] = useState<string | null>(null)
+  const [telegramSentAutomatic, setTelegramSentAutomatic] = useState(false)
 
   useEffect(() => {
+    // Check localStorage first for instant client synchronization
+    try {
+      const saved = localStorage.getItem("ubos_store_settings")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.telegramPhone) setTelegramPhone(parsed.telegramPhone)
+        if (parsed.telegramChatId) setTelegramChatId(parsed.telegramChatId)
+        if (parsed.telegramBotToken) setTelegramBotToken(parsed.telegramBotToken)
+      }
+    } catch (e) {}
+
     fetch("/api/settings/store")
       .then((res) => res.json())
       .then((data) => {
         if (data.telegramPhone) setTelegramPhone(data.telegramPhone)
         if (data.telegramChatId) setTelegramChatId(data.telegramChatId)
+        if (data.telegramBotToken) setTelegramBotToken(data.telegramBotToken)
+        try {
+          localStorage.setItem("ubos_store_settings", JSON.stringify({
+            storeName: data.storeName,
+            telegramPhone: data.telegramPhone,
+            telegramChatId: data.telegramChatId,
+            telegramBotToken: data.telegramBotToken,
+          }))
+        } catch (e) {}
       })
       .catch(() => {})
 
@@ -99,19 +121,37 @@ export default function OwnerDashboardInterlockingClient({
     setTelegramCleanText(null)
     setTelegramShareUrl(null)
     setTelegramWhatsappUrl(null)
+    setTelegramSentAutomatic(false)
+
+    // Ensure we use the freshest values
+    let effectivePhone = telegramPhone
+    let effectiveChatId = telegramChatId
+    let effectiveBotToken = telegramBotToken
+    try {
+      const saved = localStorage.getItem("ubos_store_settings")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (!effectivePhone && parsed.telegramPhone) effectivePhone = parsed.telegramPhone
+        if (!effectiveChatId && parsed.telegramChatId) effectiveChatId = parsed.telegramChatId
+        if (!effectiveBotToken && parsed.telegramBotToken) effectiveBotToken = parsed.telegramBotToken
+      }
+    } catch (e) {}
+
     try {
       const res = await fetch("/api/telegram/daily-report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           branchId: selectedBranchId,
-          recipient: telegramPhone,
-          chatId: telegramChatId || undefined,
+          recipient: effectivePhone || "083153598697",
+          chatId: effectiveChatId || undefined,
+          botToken: effectiveBotToken || undefined,
         }),
       })
       const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error || "Gagal memproses pengiriman")
-      setTelegramStatus(data.message || `Laporan transaksi harian siap untuk ${telegramPhone}.`)
+      if (!res.ok && data.error) throw new Error(data.error || "Gagal memproses pengiriman")
+      setTelegramStatus(data.message || `Laporan transaksi harian diproses.`)
+      setTelegramSentAutomatic(Boolean(data.sentAutomatic))
       if (data.cleanText) setTelegramCleanText(data.cleanText)
       if (data.shareUrl) setTelegramShareUrl(data.shareUrl)
       if (data.whatsappUrl) setTelegramWhatsappUrl(data.whatsappUrl)
@@ -223,10 +263,14 @@ export default function OwnerDashboardInterlockingClient({
             type="button"
             onClick={handleSendTelegramReport}
             disabled={sendingTelegram}
-            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
           >
             <Send className="w-4 h-4" />
-            <span>{sendingTelegram ? "Menyiapkan..." : `Kirim Laporan Telegram (${telegramPhone})`}</span>
+            <span>
+              {sendingTelegram
+                ? "Mengirim Laporan..."
+                : `Kirim Laporan Telegram (${telegramChatId ? `Grup ${telegramChatId}` : telegramPhone})`}
+            </span>
           </button>
           <div className="w-full sm:w-64">
             <BranchSelector allowAll={true} />
@@ -236,12 +280,30 @@ export default function OwnerDashboardInterlockingClient({
 
       {/* Telegram Report Status Banner */}
       {telegramStatus && (
-        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+        <div
+          className={`rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200 border ${
+            telegramSentAutomatic
+              ? "bg-emerald-50 border-emerald-300 text-emerald-950 shadow-xs"
+              : "bg-sky-50 border-sky-200 text-sky-950"
+          }`}
+        >
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />
+            <CheckCircle2
+              className={`w-5 h-5 shrink-0 mt-0.5 ${
+                telegramSentAutomatic ? "text-emerald-600" : "text-sky-600"
+              }`}
+            />
             <div>
-              <h4 className="text-xs font-bold text-sky-950">Laporan Transaksi Harian Siap</h4>
-              <p className="text-xs text-sky-800 mt-0.5">{telegramStatus}</p>
+              <h4 className="text-xs font-extrabold">
+                {telegramSentAutomatic ? "✓ Laporan Otomatis Terkirim ke Telegram!" : "Laporan Transaksi Harian"}
+              </h4>
+              <p
+                className={`text-xs mt-0.5 ${
+                  telegramSentAutomatic ? "text-emerald-800 font-medium" : "text-sky-800"
+                }`}
+              >
+                {telegramStatus}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">

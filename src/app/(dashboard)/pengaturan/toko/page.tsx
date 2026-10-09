@@ -36,11 +36,20 @@ export default async function StoreSettingsPage() {
 
   const runtime = await getStoreSettings()
 
-  const storeName = business?.name || runtime.storeName || "Toko meruvin"
-  const profileImage = user?.image || runtime.profileImage || null
-  // Inisialisasi awal nomor telegram dari nomor telepon akun pendaftaran (User.phone)
-  const telegramPhone = user?.phone?.trim() || runtime.telegramPhone || DEFAULT_TELEGRAM_RECIPIENT
-  const telegramChatId = runtime.telegramChatId || null
+  const sysSettings = await prisma.systemSetting.findMany({
+    where: {
+      key: {
+        in: ["store_name", "store_telegram_phone", "store_telegram_chat_id", "store_telegram_bot_token", "store_profile_image"]
+      }
+    }
+  }).catch(() => [])
+  const sysMap = Object.fromEntries(sysSettings.map(s => [s.key, s.value]))
+
+  const storeName = sysMap["store_name"] || business?.name || runtime.storeName || "MERUVIN"
+  const profileImage = user?.image || sysMap["store_profile_image"] || runtime.profileImage || null
+  const telegramPhone = sysMap["store_telegram_phone"] || user?.phone?.trim() || runtime.telegramPhone || DEFAULT_TELEGRAM_RECIPIENT
+  const telegramChatId = sysMap["store_telegram_chat_id"] || runtime.telegramChatId || "-5332437584"
+  const telegramBotToken = sysMap["store_telegram_bot_token"] || runtime.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || null
 
   if (telegramPhone) {
     setActiveTelegramRecipient(telegramPhone)
@@ -54,6 +63,7 @@ export default async function StoreSettingsPage() {
     profileImage,
     telegramPhone,
     telegramChatId,
+    telegramBotToken,
     userEmail: user?.email || "",
     userName: user?.name || "",
   }

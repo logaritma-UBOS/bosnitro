@@ -24,11 +24,21 @@ export async function GET() {
 
     const runtime = await getStoreSettings()
 
-    const storeName = business?.name || runtime.storeName || "Toko meruvin"
-    const profileImage = user?.image || runtime.profileImage || null
-    // Inisialisasi nomor telegram dari nomor telepon akun saat registrasi, atau fallback
-    const telegramPhone = user?.phone?.trim() || runtime.telegramPhone || DEFAULT_TELEGRAM_RECIPIENT
-    const telegramChatId = runtime.telegramChatId || null
+    // Query Prisma SystemSetting for multi-tenant / serverless persistent settings
+    const sysSettings = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: ["store_name", "store_telegram_phone", "store_telegram_chat_id", "store_telegram_bot_token", "store_profile_image"]
+        }
+      }
+    }).catch(() => [])
+    const sysMap = Object.fromEntries(sysSettings.map(s => [s.key, s.value]))
+
+    const storeName = sysMap["store_name"] || business?.name || runtime.storeName || "MERUVIN"
+    const profileImage = user?.image || sysMap["store_profile_image"] || runtime.profileImage || null
+    const telegramPhone = sysMap["store_telegram_phone"] || user?.phone?.trim() || runtime.telegramPhone || DEFAULT_TELEGRAM_RECIPIENT
+    const telegramChatId = sysMap["store_telegram_chat_id"] || runtime.telegramChatId || "-5332437584"
+    const telegramBotToken = sysMap["store_telegram_bot_token"] || runtime.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || null
 
     // Pastikan sinkronisasi telegram runtime
     if (telegramPhone) {
@@ -43,6 +53,7 @@ export async function GET() {
       profileImage,
       telegramPhone,
       telegramChatId,
+      telegramBotToken,
       userEmail: user?.email || "",
       userName: user?.name || "",
     })
@@ -60,7 +71,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { storeName, profileImage, telegramPhone, telegramChatId } = body
+    const { storeName, profileImage, telegramPhone, telegramChatId, telegramBotToken } = body
 
     if (!storeName || !storeName.trim()) {
       return NextResponse.json({ error: "Nama toko wajib diisi" }, { status: 400 })
@@ -69,6 +80,7 @@ export async function POST(req: NextRequest) {
     const cleanStoreName = storeName.trim()
     const cleanTelegramPhone = (telegramPhone || "").trim()
     const cleanTelegramChatId = (telegramChatId || "").trim() || null
+    const cleanTelegramBotToken = (telegramBotToken || "").trim() || null
 
     // 1. Update User (phone & image)
     await prisma.user.update({
@@ -92,12 +104,13 @@ export async function POST(req: NextRequest) {
       }).catch(e => console.warn("Failed updating business name:", e))
     }
 
-    // 3. Update runtime store settings
+    // 3. Update runtime store settings & Prisma SystemSetting
     await updateStoreSettings({
       storeName: cleanStoreName,
       profileImage: profileImage !== undefined ? profileImage : undefined,
       telegramPhone: cleanTelegramPhone || undefined,
       telegramChatId: cleanTelegramChatId,
+      telegramBotToken: cleanTelegramBotToken,
     })
 
     // 4. Sinkronisasi langsung ke active telegram recipient & chat id
@@ -108,12 +121,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Pengaturan toko dan integrasi Telegram berhasil diperbarui!",
+      message: "Pengaturan profil toko dan integrasi Telegram berhasil disimpan & disinkronkan!",
       data: {
         storeName: cleanStoreName,
         profileImage,
         telegramPhone: cleanTelegramPhone,
         telegramChatId: cleanTelegramChatId,
+        telegramBotToken: cleanTelegramBotToken,
       }
     })
   } catch (error: any) {

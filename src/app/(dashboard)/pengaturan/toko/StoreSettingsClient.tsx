@@ -36,6 +36,7 @@ import {
   Play,
   Check,
   Cloud,
+  Key,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -58,11 +59,26 @@ export default function StoreSettingsClient({
   const [storeName, setStoreName] = useState(initialSettings.storeName)
   const [telegramPhone, setTelegramPhone] = useState(initialSettings.telegramPhone)
   const [telegramChatId, setTelegramChatId] = useState(initialSettings.telegramChatId || "")
+  const [telegramBotToken, setTelegramBotToken] = useState(initialSettings.telegramBotToken || "")
   const [profileImage, setProfileImage] = useState<string | null>(initialSettings.profileImage)
 
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  // Sync with browser localStorage on mount to guarantee client persistence
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ubos_store_settings")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.storeName && !initialSettings.storeName) setStoreName(parsed.storeName)
+        if (parsed.telegramPhone && !initialSettings.telegramPhone) setTelegramPhone(parsed.telegramPhone)
+        if (parsed.telegramChatId && !initialSettings.telegramChatId) setTelegramChatId(parsed.telegramChatId)
+        if (parsed.telegramBotToken && !initialSettings.telegramBotToken) setTelegramBotToken(parsed.telegramBotToken)
+      }
+    } catch (e) {}
+  }, [initialSettings])
 
   // Hardware Settings State
   const [hwSettings, setHwSettings] = useState<HardwareSettings>({
@@ -189,14 +205,29 @@ export default function StoreSettingsClient({
           profileImage,
           telegramPhone: telegramPhone.trim(),
           telegramChatId: telegramChatId.trim(),
+          telegramBotToken: telegramBotToken.trim(),
         }),
       })
 
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Gagal menyimpan")
 
+      // Persist in localStorage for instant synchronization across all pages
+      try {
+        localStorage.setItem(
+          "ubos_store_settings",
+          JSON.stringify({
+            storeName: storeName.trim(),
+            profileImage,
+            telegramPhone: telegramPhone.trim(),
+            telegramChatId: telegramChatId.trim(),
+            telegramBotToken: telegramBotToken.trim(),
+          })
+        )
+      } catch (e) {}
+
       setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
+      setTimeout(() => setSaveSuccess(false), 4000)
     } catch (err: any) {
       setErrorMessage(err.message || "Terjadi kesalahan saat menyimpan")
     } finally {
@@ -342,6 +373,7 @@ export default function StoreSettingsClient({
         body: JSON.stringify({
           recipient: telegramPhone.trim(),
           chatId: telegramChatId.trim() || undefined,
+          botToken: telegramBotToken.trim() || undefined,
         }),
       })
       const data = await res.json()
@@ -523,16 +555,88 @@ export default function StoreSettingsClient({
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end">
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Token Bot Telegram (Opsional untuk Kirim Otomatis)
+                  </label>
+                  <span className="text-[10px] text-slate-400">Dari @BotFather</span>
+                </div>
+                <div className="relative">
+                  <Key className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="password"
+                    value={telegramBotToken}
+                    onChange={(e) => setTelegramBotToken(e.target.value)}
+                    placeholder="Contoh: 7123456789:AAHxxxxx..."
+                    className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl font-mono"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Masukkan token dari <strong>@BotFather</strong> dan pastikan bot telah diundang ke grup Telegram toko (<strong>{telegramChatId || "-5332437584"}</strong>) agar laporan terkirim 100% otomatis.
+                </p>
+              </div>
+
+              <div className="pt-3 flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleTestTelegram}
+                  disabled={testingTelegram}
+                  className="px-4 py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs rounded-xl border border-sky-200 flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Send className="w-3.5 h-3.5 text-sky-600" />
+                  <span>{testingTelegram ? "Menguji..." : "Uji Coba Kirim Telegram"}</span>
+                </button>
+
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   <span>{saving ? "Menyimpan..." : "Simpan Profil Toko"}</span>
                 </button>
               </div>
+
+              {telegramTestResult && (
+                <div className={`p-4 rounded-2xl text-xs font-medium border animate-in fade-in ${
+                  telegramTestResult.message.startsWith("✓")
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                    : "bg-sky-50 border-sky-200 text-sky-900"
+                }`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-bold">{telegramTestResult.message}</span>
+                  </div>
+                  {telegramTestResult.shareUrl && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <a
+                        href={telegramTestResult.shareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Buka di Telegram</span>
+                      </a>
+                      {telegramTestResult.cleanText && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(telegramTestResult.cleanText || "")
+                            setCopied(true)
+                            setTimeout(() => setCopied(false), 2000)
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>{copied ? "Tersalin!" : "Salin Teks"}</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </form>

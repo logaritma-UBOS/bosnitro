@@ -29,8 +29,22 @@ export function setActiveTelegramChatId(chatId: string | null) {
  * Telegram Notification Helper for IoT Fraud & Anomaly Alerts
  */
 export async function sendTelegramAlert(message: string): Promise<boolean> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-  const targetChatId = activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
+  let botToken = process.env.TELEGRAM_BOT_TOKEN
+  let targetChatId = activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
+
+  if (!botToken || !targetChatId) {
+    try {
+      const { prisma } = await import("@/lib/prisma")
+      if (!botToken) {
+        const sysToken = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_bot_token" } })
+        if (sysToken?.value) botToken = sysToken.value
+      }
+      if (!targetChatId) {
+        const sysChat = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_chat_id" } })
+        if (sysChat?.value) targetChatId = sysChat.value
+      }
+    } catch (e) {}
+  }
 
   if (!botToken || !targetChatId) {
     console.log(`[Telegram Alert Fallback -> Target Phone: ${activeTelegramRecipient} | ChatId: ${targetChatId || "none"}]:\n`, message)
@@ -174,9 +188,12 @@ ${allAlerts.length > 0 ? allAlerts.map(a => `  ⚠️ [${a.branchName}] ${a.mess
 export async function sendDailyBranchReportTelegram(
   branchId?: string,
   targetRecipient?: string,
-  targetChatId?: string
+  targetChatId?: string,
+  customBotToken?: string
 ): Promise<{
   success: boolean
+  sentAutomatic?: boolean
+  status?: "SENT_AUTOMATIC" | "TELEGRAM_API_ERROR" | "NEED_BOT_TOKEN" | "PREPARED"
   message: string
   reportText: string
   cleanText: string
@@ -184,7 +201,25 @@ export async function sendDailyBranchReportTelegram(
   whatsappUrl: string
 }> {
   const recipient = targetRecipient || activeTelegramRecipient
-  const destinationChatId = targetChatId || activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
+  let destinationChatId = targetChatId || activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
+
+  // If destinationChatId is still missing, attempt to fetch from DB
+  if (!destinationChatId) {
+    try {
+      const { prisma } = await import("@/lib/prisma")
+      const sysChat = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_chat_id" } })
+      if (sysChat?.value) destinationChatId = sysChat.value
+    } catch (e) {}
+  }
+
+  let botToken = customBotToken || process.env.TELEGRAM_BOT_TOKEN
+  if (!botToken) {
+    try {
+      const { prisma } = await import("@/lib/prisma")
+      const sysToken = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_bot_token" } })
+      if (sysToken?.value) botToken = sysToken.value
+    } catch (e) {}
+  }
 
   const { reportText, branchName } = await generateDailyBranchReportText(branchId, recipient)
 
@@ -200,61 +235,70 @@ export async function sendDailyBranchReportTelegram(
   if (waPhone.startsWith("0")) waPhone = "62" + waPhone.substring(1)
   const whatsappUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(cleanTextForUrl)}`
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  // Jika botToken dan destinationChatId tersedia, kirim langsung via Telegram API secara otomatis!
+  if (botToken && destinationChatId) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: destinationChatId,
+          text: reportText,
+          parse_mode: "HTML",
+        }),
+      })
 
-  if (!botToken || !destinationChatId) {
-    console.log(`[Telegram Bot Report to ${recipient} | ChatId: ${destinationChatId || "none"}] (Bot token/chatId belum diset di .env):\n${cleanTextForUrl}`)
-    return {
-      success: true,
-      message: `Laporan cabang "${branchName}" berhasil disiapkan untuk ${recipient}. Teks siap disalin atau dibuka via Telegram/WhatsApp.`,
-      reportText,
-      cleanText: cleanTextForUrl,
-      shareUrl,
-      whatsappUrl,
+      if (res.ok) {
+        return {
+          success: true,
+          sentAutomatic: true,
+          status: "SENT_AUTOMATIC",
+          message: `✓ Laporan cabang "${branchName}" berhasil terkirim otomatis ke Grup Telegram (${destinationChatId})!`,
+          reportText,
+          cleanText: cleanTextForUrl,
+          shareUrl,
+          whatsappUrl,
+        }
+      } else {
+        const errJson = await res.json().catch(() => ({}))
+        const errorDesc = errJson.description || res.statusText || "Gagal menghubungi Telegram API"
+        return {
+          success: false,
+          sentAutomatic: false,
+          status: "TELEGRAM_API_ERROR",
+          message: `Gagal mengirim otomatis: ${errorDesc}. Pastikan Bot sudah diundang ke grup (${destinationChatId}) dan memiliki hak kirim pesan.`,
+          reportText,
+          cleanText: cleanTextForUrl,
+          shareUrl,
+          whatsappUrl,
+        }
+      }
+    } catch (error: any) {
+      console.error("[Telegram Bot API Send Error]:", error)
+      return {
+        success: false,
+        sentAutomatic: false,
+        status: "TELEGRAM_API_ERROR",
+        message: `Koneksi Telegram: ${error.message}. Silakan periksa koneksi atau gunakan tombol Buka di Telegram.`,
+        reportText,
+        cleanText: cleanTextForUrl,
+        shareUrl,
+        whatsappUrl,
+      }
     }
   }
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: destinationChatId,
-        text: reportText,
-        parse_mode: "HTML",
-      }),
-    })
-
-    if (res.ok) {
-      return {
-        success: true,
-        message: `Laporan cabang "${branchName}" berhasil dikirim langsung ke Bot / Grup Telegram (${destinationChatId}).`,
-        reportText,
-        cleanText: cleanTextForUrl,
-        shareUrl,
-        whatsappUrl,
-      }
-    } else {
-      const errJson = await res.json().catch(() => ({}))
-      console.warn("[Telegram Bot API Response Warning]:", errJson)
-      return {
-        success: true,
-        message: `Laporan cabang "${branchName}" siap dikirim via Telegram atau WhatsApp ke ${recipient}.`,
-        reportText,
-        cleanText: cleanTextForUrl,
-        shareUrl,
-        whatsappUrl,
-      }
-    }
-  } catch (error: any) {
-    console.error("[Telegram Bot API Send Error]:", error)
-    return {
-      success: true,
-      message: `Laporan cabang "${branchName}" siap dikirim via Telegram atau WhatsApp ke ${recipient}.`,
-      reportText,
-      cleanText: cleanTextForUrl,
-      shareUrl,
-      whatsappUrl,
-    }
+  // Fallback jika belum ada botToken
+  return {
+    success: true,
+    sentAutomatic: false,
+    status: destinationChatId ? "NEED_BOT_TOKEN" : "PREPARED",
+    message: destinationChatId
+      ? `ID Grup Telegram (${destinationChatId}) tersinkronisasi. Masukkan Token Bot Telegram di Pengaturan Toko untuk kirim otomatis 1-klik tanpa membuka aplikasi Telegram.`
+      : `Laporan cabang "${branchName}" berhasil disiapkan untuk ${recipient}. Teks siap disalin atau dibuka via Telegram/WhatsApp.`,
+    reportText,
+    cleanText: cleanTextForUrl,
+    shareUrl,
+    whatsappUrl,
   }
 }

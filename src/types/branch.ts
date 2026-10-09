@@ -17,6 +17,7 @@ export type StoreProfileSettings = {
   profileImage: string | null
   telegramPhone: string
   telegramChatId?: string | null
+  telegramBotToken?: string | null
   userEmail?: string
   userName?: string
 }

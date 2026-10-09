@@ -10,12 +10,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { branchId, recipient, chatId } = body
+    const { branchId, recipient, chatId, botToken } = body
 
     const targetRecipient = recipient?.trim() || getActiveTelegramRecipient()
     const targetChatId = chatId?.trim() || getActiveTelegramChatId() || undefined
 
-    const result = await sendDailyBranchReportTelegram(branchId, targetRecipient, targetChatId)
+    const result = await sendDailyBranchReportTelegram(branchId, targetRecipient, targetChatId, botToken?.trim())
 
     return NextResponse.json(result)
   } catch (error: any) {
