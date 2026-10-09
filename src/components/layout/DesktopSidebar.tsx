@@ -97,7 +97,7 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
       {/* Logo + Business Name */}
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="space-y-1 min-w-0">
-          <Image src="/logo-ubos.png" alt="UBOS" width={90} height={28} className="h-7 w-auto object-contain" />
+          <Image src="/logo-bosnitro.png" alt="BOSNITRO" width={140} height={34} priority className="h-8 w-auto object-contain" />
           {businessName && (
             <p className="text-xs font-bold text-gray-700 truncate">{businessName}</p>
           )}

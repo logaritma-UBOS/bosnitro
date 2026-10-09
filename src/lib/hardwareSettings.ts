@@ -30,7 +30,7 @@ const DEFAULT_HARDWARE_SETTINGS: HardwareSettings = {
   printerPaperSize: "58mm",
   bluetoothPrinterName: "RPP02N / MPT-II",
   bluetoothPrinterMac: "66:32:B1:88:9F:12",
-  printerStoreHeader: "UBOS NITROGEN & SERVICE CENTER",
+  printerStoreHeader: "BOSNITRO NITROGEN & SERVICE CENTER",
   printerFooterNote: "Terima kasih atas kunjungan Anda! Simpan struk ini sebagai bukti audit.",
   autoPrintOnSuccess: true,
   autoPrintAfterPayment: true,

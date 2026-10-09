@@ -138,7 +138,7 @@ export async function generateDailyBranchReportText(branchId?: string, recipient
   const reportText = `
 <b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 <b>LAPORAN TRANSAKSI & ANTI-LOSS HARIAN</b>
-<b>UBOS MULTI-BRANCH NITROGEN & RITEL</b>
+<b>BOSNITRO MULTI-BRANCH NITROGEN & RITEL</b>
 <b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 <b>Cabang:</b> ${branchName}
@@ -171,7 +171,7 @@ export async function generateDailyBranchReportText(branchId?: string, recipient
 ${allAlerts.length > 0 ? allAlerts.map(a => `  ⚠️ [${a.branchName}] ${a.message}`).join("\n") : "  ✓ Seluruh sensor flow meter normal (Tidak ada bypass liar)."}
 
 <b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
-<i>Laporan otomatis dihasilkan oleh UBOS Anti-Loss Interlocking System.</i>
+<i>Laporan otomatis dihasilkan oleh BOSNITRO Anti-Loss Interlocking System.</i>
 `.trim()
 
   return {

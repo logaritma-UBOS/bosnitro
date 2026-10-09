@@ -1145,7 +1145,7 @@ export default function StoreSettingsClient({
       <BluetoothPrinterModal
         isOpen={isBluetoothModalOpen}
         onClose={() => setIsBluetoothModalOpen(false)}
-        storeName={storeName || "UBOS NITROGEN"}
+        storeName={storeName || "BOSNITRO NITROGEN"}
         paperSize={hwSettings.paperSize || "58mm"}
         onPaperSizeChange={(sz) => setHwSettings({ ...hwSettings, paperSize: sz })}
       />

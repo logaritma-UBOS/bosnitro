@@ -188,7 +188,7 @@ export default function UbosFeed({ position = "bottom" }: { position?: "top" | "
         {freeArticles.length > 0 && (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">Info & Panduan UBOS</h3>
+              <h3 className="text-sm font-black text-slate-500 uppercase tracking-widest">Info & Panduan BOSNITRO</h3>
               {freeArticles.length > 1 && (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-blue-500 animate-bounce-right shrink-0">
                   GESER <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>

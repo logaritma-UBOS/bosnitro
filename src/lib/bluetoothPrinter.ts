@@ -168,7 +168,7 @@ export function disconnectBluetoothPrinter(): void {
  */
 export function formatTextReceipt(
   tx: InterlockingTransaction,
-  storeName: string = "UBOS NITROGEN",
+  storeName: string = "BOSNITRO NITROGEN",
   paperSize: "58mm" | "80mm" = "58mm",
   footerText?: string
 ): string {
@@ -306,7 +306,7 @@ export async function printDirectWebBluetooth(
  * Test Print Function to verify connection immediately
  */
 export async function testPrintBluetooth(
-  storeName: string = "UBOS NITROGEN",
+  storeName: string = "BOSNITRO NITROGEN",
   paperSize: "58mm" | "80mm" = "58mm"
 ): Promise<{ success: boolean; message: string }> {
   const dummyTx: InterlockingTransaction = {

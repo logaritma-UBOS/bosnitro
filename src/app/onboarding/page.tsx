@@ -16,7 +16,7 @@ export default function OnboardingPage() {
       
       {/* Header Logo Resmi */}
       <div className="flex justify-center pt-8 pb-6">
-        <Image alt="UBOS - Universal Business Operational System" className="h-12 md:h-14 w-auto object-contain" height={72} priority src="/logo-ubos.png" width={220}/>
+        <Image alt="BOSNITRO - Business Operational System for Nitrogen" className="h-12 md:h-14 w-auto object-contain" height={60} priority src="/logo-bosnitro.png" width={250}/>
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-xl">

@@ -1,10 +1,10 @@
-﻿import { MetadataRoute } from 'next'
+import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'UBOS - UMKM Business Operation System',
-    short_name: 'UBOS',
-    description: 'Sistem Operasi Bisnis UMKM. Hitung HPP, Kasir POS, dan AI Logaritma.',
+    name: 'BOSNITRO - Business Operational System for Nitrogen',
+    short_name: 'BOSNITRO',
+    description: 'Sistem Operasi Bisnis Nitrogen & Bengkel Indonesia.',
     start_url: '/',
     display: 'standalone',
     background_color: '#f8fafc',

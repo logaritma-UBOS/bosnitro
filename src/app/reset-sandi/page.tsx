@@ -82,7 +82,7 @@ export default function ResetSandiPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-5 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center mb-6 hover:opacity-90 transition-opacity">
-          <Image alt="UBOS Logo" className="h-14 md:h-16 w-auto object-contain" height={72} priority src="/logo-ubos.png" width={220}/>
+          <Image alt="BOSNITRO Logo" className="h-14 md:h-16 w-auto object-contain" height={60} priority src="/logo-bosnitro.png" width={250}/>
         </Link>
         <h1 className="text-center text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
           Buat Sandi Baru

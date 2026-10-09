@@ -79,7 +79,7 @@ export default function LiveChatWidget({ userId }: { userId: string }) {
                     <div className="bg-indigo-600 p-4 text-white flex justify-between items-center flex-shrink-0">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                            <span className="font-bold text-sm">Live Support UBOS</span>
+                            <span className="font-bold text-sm">Live Support BOSNITRO</span>
                         </div>
                         <button onClick={() => setIsOpen(false)} className="hover:text-gray-200 p-1">
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
@@ -87,11 +87,11 @@ export default function LiveChatWidget({ userId }: { userId: string }) {
                     </div>
                     {/* Messages */}
                     <div className="flex-1 p-4 overflow-y-auto bg-gray-50 flex flex-col gap-3">
-                        <div className="text-center text-xs text-gray-400">Pesan Anda dibalas oleh Tim UBOS.</div>
+                        <div className="text-center text-xs text-gray-400">Pesan Anda dibalas oleh Tim BOSNITRO.</div>
                         {messages.map(msg => (
                             <div key={msg.id} className={`flex ${msg.senderRole === "USER" ? "justify-end" : "justify-start"}`}>
                                 {msg.senderRole === "ADMIN" && (
-                                    <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center mr-1.5 flex-shrink-0 mt-auto">U</div>
+                                    <div className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center mr-1.5 flex-shrink-0 mt-auto">B</div>
                                 )}
                                 <div className={`max-w-[75%] p-3 rounded-2xl text-sm leading-relaxed ${msg.senderRole === "USER" ? "bg-indigo-600 text-white rounded-tr-none" : "bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm"}`}>
                                     {msg.message}

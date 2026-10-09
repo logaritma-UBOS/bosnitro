@@ -6,11 +6,11 @@ export default function GlobalLoading() {
       <div className="flex flex-col items-center gap-6 animate-pulse">
         {/* Logo 3D */}
         <Image 
-          src="/logo-ubos.png" 
-          alt="UBOS Loading..." 
-          width={150} 
-          height={50} 
-          className="h-16 w-auto object-contain" 
+          src="/logo-bosnitro.png" 
+          alt="BOSNITRO Loading..." 
+          width={220} 
+          height={55} 
+          className="h-14 md:h-16 w-auto object-contain" 
           priority 
         />
         

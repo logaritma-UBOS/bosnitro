@@ -72,7 +72,7 @@ export default function NotificationBell() {
               notifications.map((n) => (
                 <div key={n.id} onClick={() => handleClick(n)} className={`p-3 rounded-lg border cursor-pointer transition-colors ${!n.readAt ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-100 hover:bg-slate-50'}`}>
                   <div className="flex justify-between items-start mb-1">
-                    <h4 className={`text-xs ${!n.readAt ? 'font-bold text-blue-900' : 'font-semibold text-slate-700'}`}>{n.title || "Pesan dari UBOS"}</h4>
+                    <h4 className={`text-xs ${!n.readAt ? 'font-bold text-blue-900' : 'font-semibold text-slate-700'}`}>{n.title || "Pesan dari BOSNITRO"}</h4>
                     <span className="text-[9px] text-slate-400 shrink-0 ml-2">{new Date(n.createdAt).toLocaleDateString('id-ID')}</span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-snug mb-2">{n.message}</p>

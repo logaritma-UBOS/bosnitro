@@ -67,7 +67,7 @@ export default function RequireWhatsappModal() {
           </div>
           <h2 className="text-2xl font-black mb-2">Pembaruan Keamanan</h2>
           <p className="text-blue-100 text-sm leading-relaxed">
-            Untuk mengamankan akun dan mendapatkan akses notifikasi prioritas dari UBOS, Anda wajib melengkapi nomor WhatsApp.
+            Untuk mengamankan akun dan mendapatkan akses notifikasi prioritas dari BOSNITRO, Anda wajib melengkapi nomor WhatsApp.
           </p>
         </div>
         

@@ -12,12 +12,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "UBOS - UMKM Business Operation System",
-  description: "Sistem Operasi Bisnis untuk UMKM Indonesia",
+  title: "BOSNITRO - Business Operational System for Nitrogen",
+  description: "Sistem Operasi Bisnis Nitrogen & Bengkel Indonesia",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "UBOS",
+    title: "BOSNITRO",
   },
 };
 

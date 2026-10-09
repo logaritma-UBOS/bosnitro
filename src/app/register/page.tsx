@@ -17,12 +17,12 @@ export default function RegisterPage() {
 
         {/* Logo */}
         <Link href="/" className="flex justify-center mb-6 hover:opacity-90 transition-opacity">
-          <Image alt="UBOS - Universal Business Operational System" className="h-14 md:h-16 w-auto object-contain" height={72} priority src="/logo-ubos.png" width={220}/>
+          <Image alt="BOSNITRO - Business Operational System for Nitrogen" className="h-14 md:h-16 w-auto object-contain" height={60} priority src="/logo-bosnitro.png" width={250}/>
         </Link>
 
         {/* Headline */}
         <h1 className="text-center text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-          Mulai Gunakan UBOS
+          Mulai Gunakan BOSNITRO
         </h1>
         <p className="mt-2 text-center text-sm text-slate-500 max-w-xs mx-auto">
           Daftar sekarang dan optimalkan keuntungan usaha Anda.

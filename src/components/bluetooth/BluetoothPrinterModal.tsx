@@ -34,7 +34,7 @@ interface BluetoothPrinterModalProps {
 export default function BluetoothPrinterModal({
   isOpen,
   onClose,
-  storeName = "UBOS NITROGEN",
+  storeName = "BOSNITRO NITROGEN",
   paperSize = "58mm",
   onPaperSizeChange,
 }: BluetoothPrinterModalProps) {

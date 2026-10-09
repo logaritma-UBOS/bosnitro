@@ -15,7 +15,7 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
-  let businessName = "UBOS"
+  let businessName = "BOSNITRO"
   const whereClause = (session.user as any).staffBusinessId ? { id: (session.user as any).staffBusinessId } : { userId: session.user.id };
   const business = await prisma.business.findFirst({ where: whereClause })
   
