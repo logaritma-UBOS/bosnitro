@@ -69,17 +69,6 @@ export default function OwnerDashboardInterlockingClient({
   const [telegramSentAutomatic, setTelegramSentAutomatic] = useState(false)
 
   useEffect(() => {
-    // Check localStorage first for instant client synchronization
-    try {
-      const saved = localStorage.getItem("ubos_store_settings")
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (parsed.telegramPhone) setTelegramPhone(parsed.telegramPhone)
-        if (parsed.telegramChatId) setTelegramChatId(parsed.telegramChatId)
-        if (parsed.telegramBotToken) setTelegramBotToken(parsed.telegramBotToken)
-      }
-    } catch (e) {}
-
     fetch("/api/settings/store")
       .then((res) => res.json())
       .then((data) => {
@@ -87,7 +76,8 @@ export default function OwnerDashboardInterlockingClient({
         if (data.telegramChatId) setTelegramChatId(data.telegramChatId)
         if (data.telegramBotToken) setTelegramBotToken(data.telegramBotToken)
         try {
-          localStorage.setItem("ubos_store_settings", JSON.stringify({
+          const userKey = data.userId || data.userEmail || "default"
+          localStorage.setItem(`ubos_store_settings_${userKey}`, JSON.stringify({
             storeName: data.storeName,
             telegramPhone: data.telegramPhone,
             telegramChatId: data.telegramChatId,

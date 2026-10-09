@@ -6,8 +6,16 @@ import { upsertCustomer } from "@/lib/crmDb"
 // Dynamic runtime branches (starts with 1 initial branch from DEFAULT_BRANCHES, expandable)
 let runtimeBranches: Branch[] = [...DEFAULT_BRANCHES]
 
-// Dynamic runtime store settings
-let runtimeStoreSettings = {
+// Dynamic runtime store settings map (scoped by businessId/userId)
+const scopedRuntimeStoreSettings: Record<string, {
+  storeName: string
+  profileImage: string | null
+  telegramPhone: string
+  telegramChatId: string | null
+  telegramBotToken: string | null
+}> = {}
+
+const DEFAULT_STORE_SETTINGS = {
   storeName: "MERUVIN",
   profileImage: null as string | null,
   telegramPhone: "083153598697",
@@ -15,89 +23,132 @@ let runtimeStoreSettings = {
   telegramBotToken: null as string | null,
 }
 
-export async function getStoreSettings(): Promise<{
+export async function getStoreSettings(scopeId?: string): Promise<{
   storeName: string
   profileImage: string | null
   telegramPhone: string
   telegramChatId: string | null
   telegramBotToken: string | null
 }> {
+  const keyPrefix = scopeId ? `${scopeId}_` : ""
+  
+  if (!scopedRuntimeStoreSettings[keyPrefix]) {
+    scopedRuntimeStoreSettings[keyPrefix] = { ...DEFAULT_STORE_SETTINGS }
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma")
+    const searchKeys = [
+      "store_name", "store_telegram_phone", "store_telegram_chat_id", "store_telegram_bot_token", "store_profile_image"
+    ]
+    if (scopeId) {
+      searchKeys.push(
+        `${scopeId}_store_name`,
+        `${scopeId}_store_telegram_phone`,
+        `${scopeId}_store_telegram_chat_id`,
+        `${scopeId}_store_telegram_bot_token`,
+        `${scopeId}_store_profile_image`
+      )
+    }
+
     const settings = await prisma.systemSetting.findMany({
       where: {
-        key: {
-          in: ["store_name", "store_telegram_phone", "store_telegram_chat_id", "store_telegram_bot_token", "store_profile_image"]
-        }
+        key: { in: searchKeys }
       }
     })
     const map = Object.fromEntries(settings.map(s => [s.key, s.value]))
-    if (map["store_name"]) runtimeStoreSettings.storeName = map["store_name"]
-    if (map["store_telegram_phone"]) runtimeStoreSettings.telegramPhone = map["store_telegram_phone"]
-    if (map["store_telegram_chat_id"]) runtimeStoreSettings.telegramChatId = map["store_telegram_chat_id"]
-    if (map["store_telegram_bot_token"]) runtimeStoreSettings.telegramBotToken = map["store_telegram_bot_token"]
-    if (map["store_profile_image"]) runtimeStoreSettings.profileImage = map["store_profile_image"]
+
+    const item = scopedRuntimeStoreSettings[keyPrefix]
+    if (scopeId && map[`${scopeId}_store_name`]) item.storeName = map[`${scopeId}_store_name`]
+    else if (!scopeId && map["store_name"]) item.storeName = map["store_name"]
+
+    if (scopeId && map[`${scopeId}_store_telegram_phone`]) item.telegramPhone = map[`${scopeId}_store_telegram_phone`]
+    else if (!scopeId && map["store_telegram_phone"]) item.telegramPhone = map["store_telegram_phone"]
+
+    if (scopeId && map[`${scopeId}_store_telegram_chat_id`]) item.telegramChatId = map[`${scopeId}_store_telegram_chat_id`]
+    else if (!scopeId && map["store_telegram_chat_id"]) item.telegramChatId = map["store_telegram_chat_id"]
+
+    if (scopeId && map[`${scopeId}_store_telegram_bot_token`]) item.telegramBotToken = map[`${scopeId}_store_telegram_bot_token`]
+    else if (!scopeId && map["store_telegram_bot_token"]) item.telegramBotToken = map["store_telegram_bot_token"]
+
+    if (scopeId && map[`${scopeId}_store_profile_image`]) item.profileImage = map[`${scopeId}_store_profile_image`]
+    else if (!scopeId && map["store_profile_image"]) item.profileImage = map["store_profile_image"]
   } catch (e) {}
 
-  return runtimeStoreSettings
+  return scopedRuntimeStoreSettings[keyPrefix]
 }
 
-export async function updateStoreSettings(data: {
-  storeName?: string
-  profileImage?: string | null
-  telegramPhone?: string
-  telegramChatId?: string | null
-  telegramBotToken?: string | null
-}) {
-  if (data.storeName !== undefined && data.storeName.trim()) runtimeStoreSettings.storeName = data.storeName.trim()
-  if (data.profileImage !== undefined) runtimeStoreSettings.profileImage = data.profileImage
-  if (data.telegramPhone !== undefined && data.telegramPhone.trim()) runtimeStoreSettings.telegramPhone = data.telegramPhone.trim()
-  if (data.telegramChatId !== undefined) runtimeStoreSettings.telegramChatId = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : null
-  if (data.telegramBotToken !== undefined) runtimeStoreSettings.telegramBotToken = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : null
+export async function updateStoreSettings(
+  data: {
+    storeName?: string
+    profileImage?: string | null
+    telegramPhone?: string
+    telegramChatId?: string | null
+    telegramBotToken?: string | null
+  },
+  scopeId?: string
+) {
+  const keyPrefix = scopeId ? `${scopeId}_` : ""
+  if (!scopedRuntimeStoreSettings[keyPrefix]) {
+    scopedRuntimeStoreSettings[keyPrefix] = { ...DEFAULT_STORE_SETTINGS }
+  }
+  const item = scopedRuntimeStoreSettings[keyPrefix]
 
-  // Persist directly to Prisma SystemSetting
+  if (data.storeName !== undefined && data.storeName.trim()) item.storeName = data.storeName.trim()
+  if (data.profileImage !== undefined) item.profileImage = data.profileImage
+  if (data.telegramPhone !== undefined && data.telegramPhone.trim()) item.telegramPhone = data.telegramPhone.trim()
+  if (data.telegramChatId !== undefined) item.telegramChatId = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : null
+  if (data.telegramBotToken !== undefined) item.telegramBotToken = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : null
+
+  // Persist directly to Prisma SystemSetting (scoped per account/business)
   try {
     const { prisma } = await import("@/lib/prisma")
+    const storeNameKey = scopeId ? `${scopeId}_store_name` : "store_name"
+    const phoneKey = scopeId ? `${scopeId}_store_telegram_phone` : "store_telegram_phone"
+    const chatIdKey = scopeId ? `${scopeId}_store_telegram_chat_id` : "store_telegram_chat_id"
+    const botTokenKey = scopeId ? `${scopeId}_store_telegram_bot_token` : "store_telegram_bot_token"
+    const profileImgKey = scopeId ? `${scopeId}_store_profile_image` : "store_profile_image"
+
     if (data.storeName && data.storeName.trim()) {
       await prisma.systemSetting.upsert({
-        where: { key: "store_name" },
+        where: { key: storeNameKey },
         update: { value: data.storeName.trim() },
-        create: { id: "sys-store-name", key: "store_name", value: data.storeName.trim() }
+        create: { id: `sys-${storeNameKey}`, key: storeNameKey, value: data.storeName.trim() }
       })
     }
     if (data.telegramPhone && data.telegramPhone.trim()) {
       await prisma.systemSetting.upsert({
-        where: { key: "store_telegram_phone" },
+        where: { key: phoneKey },
         update: { value: data.telegramPhone.trim() },
-        create: { id: "sys-store-phone", key: "store_telegram_phone", value: data.telegramPhone.trim() }
+        create: { id: `sys-${phoneKey}`, key: phoneKey, value: data.telegramPhone.trim() }
       })
     }
     if (data.telegramChatId !== undefined) {
       const val = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : ""
       await prisma.systemSetting.upsert({
-        where: { key: "store_telegram_chat_id" },
+        where: { key: chatIdKey },
         update: { value: val },
-        create: { id: "sys-store-chat-id", key: "store_telegram_chat_id", value: val }
+        create: { id: `sys-${chatIdKey}`, key: chatIdKey, value: val }
       })
     }
     if (data.telegramBotToken !== undefined) {
       const val = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : ""
       await prisma.systemSetting.upsert({
-        where: { key: "store_telegram_bot_token" },
+        where: { key: botTokenKey },
         update: { value: val },
-        create: { id: "sys-store-bot-token", key: "store_telegram_bot_token", value: val }
+        create: { id: `sys-${botTokenKey}`, key: botTokenKey, value: val }
       })
     }
     if (data.profileImage !== undefined && data.profileImage) {
       await prisma.systemSetting.upsert({
-        where: { key: "store_profile_image" },
+        where: { key: profileImgKey },
         update: { value: data.profileImage },
-        create: { id: "sys-store-profile-image", key: "store_profile_image", value: data.profileImage }
+        create: { id: `sys-${profileImgKey}`, key: profileImgKey, value: data.profileImage }
       })
     }
   } catch (e) {}
 
-  return runtimeStoreSettings
+  return item
 }
 
 export async function getBranches(): Promise<Branch[]> {

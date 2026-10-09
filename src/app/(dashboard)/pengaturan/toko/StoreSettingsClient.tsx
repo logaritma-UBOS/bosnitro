@@ -66,10 +66,11 @@ export default function StoreSettingsClient({
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Sync with browser localStorage on mount to guarantee client persistence
+  // Sync with browser localStorage on mount to guarantee client persistence scoped by account
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("ubos_store_settings")
+      const userKey = initialSettings.userId || initialSettings.userEmail || "default"
+      const saved = localStorage.getItem(`ubos_store_settings_${userKey}`) || (userKey === "default" ? localStorage.getItem("ubos_store_settings") : null)
       if (saved) {
         const parsed = JSON.parse(saved)
         if (parsed.storeName && !initialSettings.storeName) setStoreName(parsed.storeName)
@@ -212,10 +213,11 @@ export default function StoreSettingsClient({
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Gagal menyimpan")
 
-      // Persist in localStorage for instant synchronization across all pages
+      // Persist in localStorage for instant synchronization scoped by account
       try {
+        const userKey = initialSettings.userId || initialSettings.userEmail || "default"
         localStorage.setItem(
-          "ubos_store_settings",
+          `ubos_store_settings_${userKey}`,
           JSON.stringify({
             storeName: storeName.trim(),
             profileImage,

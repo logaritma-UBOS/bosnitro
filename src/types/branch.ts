@@ -18,6 +18,8 @@ export type StoreProfileSettings = {
   telegramPhone: string
   telegramChatId?: string | null
   telegramBotToken?: string | null
+  userId?: string
+  businessId?: string
   userEmail?: string
   userName?: string
 }
