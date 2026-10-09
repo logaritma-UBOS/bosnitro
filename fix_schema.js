@@ -1,0 +1,1 @@
+const fs = require('fs'); let c = fs.readFileSync('prisma/schema.prisma', 'utf8'); c = c.replace(/fundRequests\s+TeamFundRequest\[\]/, 'sourceLeads ManualLead[] @relation("LeadSource")\n  assignedLeads ManualLead[] @relation("LeadAssigned")\n  fundRequests TeamFundRequest[]'); fs.writeFileSync('prisma/schema.prisma', c);

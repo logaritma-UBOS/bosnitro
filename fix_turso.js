@@ -1,0 +1,1 @@
+const fs = require('fs'); let c = fs.readFileSync('run_turso_mig.js', 'utf8'); c = c.replace('20260929000000_team_os_control_tower', '20260929000000_team_os_control_tower',\n  '20260930000000_manual_lead'); fs.writeFileSync('run_turso_mig.js', c);

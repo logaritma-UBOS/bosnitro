@@ -75,7 +75,7 @@ export default function BranchSelector({ allowAll = false }: { allowAll?: boolea
               >
                 <div className="flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-emerald-600" />
-                  <span>Semua Cabang (Akumulasi)</span>
+                  <span>Dashboard Owner (Akumulasi)</span>
                 </div>
                 {isAllBranches && <Check className="w-4 h-4 text-emerald-600" />}
               </button>
