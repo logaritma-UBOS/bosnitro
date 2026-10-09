@@ -18,10 +18,9 @@
 next-env.d.ts
 
 # SQLite local databases and logs
-dev.db
+!dev.db
 dev.db-journal
 dev.db.bak
-*.db
 *.db-journal
 *.wal
 auth

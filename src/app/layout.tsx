@@ -32,12 +32,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth()
+  let session = null
   let businessId = null
-  if (session?.user?.id) {
-    const whereClause = (session.user as any).staffBusinessId ? { id: (session.user as any).staffBusinessId } : { userId: session.user.id };
-  const business = await prisma.business.findFirst({ where: whereClause })
-    if (business) businessId = business.id
+  try {
+    session = await auth()
+    if (session?.user?.id) {
+      const whereClause = (session.user as any).staffBusinessId ? { id: (session.user as any).staffBusinessId } : { userId: session.user.id };
+      const business = await prisma.business.findFirst({ where: whereClause })
+      if (business) businessId = business.id
+    }
+  } catch (err) {
+    console.warn("RootLayout auth/business fallback:", err)
   }
 
   return (
