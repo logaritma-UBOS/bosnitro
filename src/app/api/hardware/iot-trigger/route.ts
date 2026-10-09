@@ -4,7 +4,7 @@ import { getHardwareSettings } from "@/lib/hardwareSettings"
 export async function POST(req: Request) {
   try {
     const { branchId, durationSeconds, vehicleType, serviceVariant } = await req.json()
-    const settings = await getHardwareSettings()
+    const settings = await getHardwareSettings(branchId)
 
     // Determine actual timer
     const seconds = durationSeconds || (vehicleType === "MOBIL" ? settings.mobilTimerFull : settings.motorTimerTambah)

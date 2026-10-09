@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { branchId = "branch-utama", snapshotType = "PLAT_NOMOR", imageBase64, vehiclePlate } = body
-    const settings = await getHardwareSettings()
+    const settings = await getHardwareSettings(branchId)
 
     let capturedUrl = imageBase64
     let capturedMethod = "CLIENT_CAMERA"

@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const branchId = searchParams.get("branchId") // optional filter for specific branch or all
-    const settings = await getHardwareSettings()
+    const settings = await getHardwareSettings(branchId && branchId !== "ALL" ? branchId : undefined)
 
     const targetDailyOmzet = settings.targetDailyOmzet || 2500000
     const rewardBonusPool = settings.rewardBonusPool || 2000000

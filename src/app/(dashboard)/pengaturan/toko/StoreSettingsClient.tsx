@@ -41,8 +41,15 @@ export default function StoreSettingsClient({
 }: {
   initialSettings: StoreProfileSettings
 }) {
-  const { branches, refreshBranches } = useBranch()
+  const { branches, refreshBranches, selectedBranchId, selectedBranch, isAllBranches } = useBranch()
   const [activeTab, setActiveTab] = useState<"PROFIL" | "CABANG" | "HARDWARE" | "TARGET_REWARD">("PROFIL")
+
+  // Auto-switch away from HARDWARE if on Semua Cabang mode
+  useEffect(() => {
+    if (isAllBranches && activeTab === "HARDWARE") {
+      setActiveTab("PROFIL")
+    }
+  }, [isAllBranches, activeTab])
 
   // Store Profile State
   const [storeName, setStoreName] = useState(initialSettings.storeName)
@@ -97,9 +104,10 @@ export default function StoreSettingsClient({
   // Add branch modal state
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false)
 
-  // Load hardware settings on mount
+  // Load hardware settings per selected branch (Isolated per branch)
   useEffect(() => {
-    fetch("/api/hardware/settings")
+    const branchParam = isAllBranches ? "branch-utama" : selectedBranchId
+    fetch(`/api/hardware/settings?branchId=${branchParam}`)
       .then((res) => res.json())
       .then((data) => {
         if (data && !data.error) {
@@ -107,7 +115,7 @@ export default function StoreSettingsClient({
         }
       })
       .catch(console.error)
-  }, [])
+  }, [selectedBranchId, isAllBranches])
 
   // Photo upload handler
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,11 +183,16 @@ export default function StoreSettingsClient({
     setSaveSuccess(false)
     setErrorMessage(null)
 
+    const targetBranch = isAllBranches ? "branch-utama" : selectedBranchId
+
     try {
       const res = await fetch("/api/hardware/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(hwSettings),
+        body: JSON.stringify({
+          ...hwSettings,
+          branchId: targetBranch,
+        }),
       })
 
       const data = await res.json()
@@ -198,11 +211,13 @@ export default function StoreSettingsClient({
   const handleTestEsp32 = async () => {
     setTestingEsp(true)
     setEspTestResult(null)
+    const targetBranch = isAllBranches ? "branch-utama" : selectedBranchId
     try {
       const res = await fetch("/api/hardware/iot-trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          branchId: targetBranch,
           durationSeconds: hwSettings.motorTimerTambah,
           vehicleType: "MOTOR",
           serviceVariant: "ISI_TAMBAH",
@@ -221,11 +236,13 @@ export default function StoreSettingsClient({
   const handleTestCctv = async () => {
     setTestingCctv(true)
     setCctvTestResult(null)
+    const targetBranch = isAllBranches ? "branch-utama" : selectedBranchId
     try {
       const res = await fetch("/api/hardware/cctv-snapshot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          branchId: targetBranch,
           snapshotType: "PLAT_NOMOR",
           vehiclePlate: "B 1234 TEST",
         }),
@@ -376,19 +393,21 @@ export default function StoreSettingsClient({
           <span>Multi-Cabang ({branches.length})</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("HARDWARE")}
-          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === "HARDWARE" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <Cpu className="w-4 h-4 text-amber-600" />
-          <span>Integrasi Hardware & IoT</span>
-          <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-black">
-            ESP32 • CCTV • BT
-          </span>
-        </button>
+        {!isAllBranches && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("HARDWARE")}
+            className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+              activeTab === "HARDWARE" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Cpu className="w-4 h-4 text-amber-600" />
+            <span>Integrasi Hardware & IoT</span>
+            <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+              ESP32 • CCTV • BT
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -554,9 +573,27 @@ export default function StoreSettingsClient({
         </div>
       )}
 
-      {/* TAB 3: INTEGRASI HARDWARE & IOT (Requirement #3 & Image 1) */}
+      {/* TAB 3: INTEGRASI HARDWARE & IOT (Terisolasi per Cabang - Requirement #2 & #3) */}
       {activeTab === "HARDWARE" && (
         <form onSubmit={handleSaveHardwareSettings} className="space-y-6">
+          {/* Active Branch Hardware Notice */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <h4 className="text-sm font-extrabold text-emerald-950">
+                  Konfigurasi Hardware & IoT: {selectedBranch.name}
+                </h4>
+              </div>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Alamat IP ESP32, kamera CCTV, dan printer Bluetooth ini terisolasi dan hanya berlaku untuk gerai {selectedBranch.name}.
+              </p>
+            </div>
+            <span className="px-3 py-1 bg-emerald-600 text-white rounded-xl text-xs font-mono font-bold self-start sm:self-auto">
+              {selectedBranch.deviceId || selectedBranch.id}
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* SUB-PANEL 1: IOT NITROGEN (ESP32) */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">

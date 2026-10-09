@@ -97,6 +97,7 @@ export default function KatalogNitrogenRetailClient({
           id: editingNitrogen.id,
           price: nitroPrice,
           timerSeconds: nitroTimer,
+          branchId: selectedBranch?.id,
         }),
       })
 
@@ -151,6 +152,7 @@ export default function KatalogNitrogenRetailClient({
           price: retailPrice,
           costPrice: retailCostPrice,
           stock: retailStock,
+          branchId: selectedBranch?.id,
         }),
       })
 

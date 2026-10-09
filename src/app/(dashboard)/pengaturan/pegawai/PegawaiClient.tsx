@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { getStaffList, createStaff, deleteStaff } from "@/actions/staff"
-import { Plus, Trash2, Users, ShieldCheck, UserCheck, X } from "lucide-react"
+import { useBranch } from "@/context/BranchContext"
+import BranchSelector from "@/components/branch/BranchSelector"
+import { Plus, Trash2, Users, ShieldCheck, UserCheck, X, Building2 } from "lucide-react"
 
 export default function PegawaiClient() {
+  const { selectedBranch, selectedBranchId } = useBranch()
   const [staffs, setStaffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -12,9 +15,10 @@ export default function PegawaiClient() {
   const [submitLoading, setSubmitLoading] = useState(false)
 
   const loadStaffs = async () => {
+    setLoading(true)
     try {
-      const data = await getStaffList()
-      setStaffs(data)
+      const data = await getStaffList(selectedBranchId)
+      setStaffs(data || [])
     } catch (e: any) {
       console.error(e)
     } finally {
@@ -24,13 +28,14 @@ export default function PegawaiClient() {
 
   useEffect(() => {
     loadStaffs()
-  }, [])
+  }, [selectedBranchId])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setSubmitLoading(true)
     setError("")
     const formData = new FormData(e.currentTarget)
+    formData.set("branchId", selectedBranchId)
     try {
       await createStaff(formData)
       setShowModal(false)
@@ -52,28 +57,31 @@ export default function PegawaiClient() {
     }
   }
 
-  if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Memuat data pegawai...</div>
-
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-800">Manajemen Pegawai & Hak Akses</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Manajemen Pegawai & Hak Akses</h1>
           </div>
-          <p className="text-slate-500 text-sm">
-            Buat akun kasir atau manajer dengan pembatasan hak akses sistem interlocking & POS
+          <p className="text-slate-500 text-xs sm:text-sm">
+            Daftar karyawan dan kasir yang bertugas di <strong>{selectedBranch.name}</strong> ({selectedBranch.location})
           </p>
         </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 w-full sm:w-auto shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Tambah Pegawai
-        </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="w-48 hidden sm:block">
+            <BranchSelector allowAll={false} />
+          </div>
+          <button 
+            onClick={() => setShowModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 w-full sm:w-auto shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Tambah Pegawai
+          </button>
+        </div>
       </div>
 
       {/* Role explanation cards */}
@@ -146,6 +154,11 @@ export default function PegawaiClient() {
             <form onSubmit={handleSubmit} className="p-6">
               {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl">{error}</div>}
               
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200/60 rounded-xl text-xs text-emerald-900 font-semibold mb-4 flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Menugaskan pegawai ke: <strong>{selectedBranch.name}</strong></span>
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Nama Lengkap</label>

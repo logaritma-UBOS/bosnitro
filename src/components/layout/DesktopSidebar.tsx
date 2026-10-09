@@ -5,6 +5,7 @@ import { logoutUser } from "@/actions/auth"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import BranchSelector from "@/components/branch/BranchSelector"
+import { useBranch } from "@/context/BranchContext"
 import {
   LayoutDashboard,
   Receipt,
@@ -22,45 +23,62 @@ import {
   ShieldCheck,
 } from "lucide-react"
 
-const navGroups = [
+type NavItem = {
+  label: string
+  href: string
+  icon: any
+  scope: "ALL_ONLY" | "BRANCH_ONLY" | "BOTH"
+}
+
+type NavGroup = {
+  label: string | null
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
   {
     label: null,
     items: [
-      { label: "Dashboard", href: "/beranda", icon: LayoutDashboard },
-    ]
+      { label: "Dashboard", href: "/beranda", icon: LayoutDashboard, scope: "BOTH" },
+    ],
   },
   {
     label: "Operasional & Jualan",
     items: [
-      { label: "Kasir POS", href: "/kasir", icon: Receipt },
-      { label: "Tutup Shift", href: "/shift-closing", icon: Lock },
-      { label: "Riwayat", href: "/riwayat", icon: History },
-      { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck },
-    ]
+      // Menu khusus cabang fisik
+      { label: "Kasir POS", href: "/kasir", icon: Receipt, scope: "BRANCH_ONLY" },
+      { label: "Tutup Shift", href: "/shift-closing", icon: Lock, scope: "BRANCH_ONLY" },
+      { label: "Riwayat", href: "/riwayat", icon: History, scope: "BOTH" },
+      // Audit & Fraud hanya ada di Semua Cabang (Level Pusat)
+      { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck, scope: "ALL_ONLY" },
+    ],
   },
   {
     label: "Kelola & Stok",
     items: [
-      { label: "Katalog & Timer", href: "/katalog", icon: Package },
-      { label: "Pelanggan & CRM", href: "/crm", icon: Users },
-      { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign },
-      { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users },
-      { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store },
-    ]
+      // Katalog, Pegawai, Pengaturan & IoT hanya di masing-masing cabang
+      { label: "Katalog & Timer", href: "/katalog", icon: Package, scope: "BRANCH_ONLY" },
+      { label: "Pelanggan & CRM", href: "/crm", icon: Users, scope: "BOTH" },
+      { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BOTH" },
+      { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users, scope: "BRANCH_ONLY" },
+      { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BRANCH_ONLY" },
+    ],
   },
   {
-    label: "Pahami Bisnis",
+    label: "Pahami Bisnis (Konsolidasi)",
     items: [
-      { label: "Performa Produk", href: "/performa-produk", icon: TrendingUp },
-      { label: "Rata-rata Belanja", href: "/performa-aov", icon: BarChart3 },
-      { label: "Laporan Keuangan", href: "/laporan", icon: ReceiptText },
-    ]
-  }
+      // Analisis performa produk, AOV, dan laporan keuangan hanya di Semua Cabang
+      { label: "Performa Produk", href: "/performa-produk", icon: TrendingUp, scope: "ALL_ONLY" },
+      { label: "Rata-rata Belanja", href: "/performa-aov", icon: BarChart3, scope: "ALL_ONLY" },
+      { label: "Laporan Keuangan", href: "/laporan", icon: ReceiptText, scope: "ALL_ONLY" },
+    ],
+  },
 ]
 
-export default function DesktopSidebar({ businessName, role = "OWNER" }: { businessName?: string, role?: string }) {
+export default function DesktopSidebar({ businessName, role = "OWNER" }: { businessName?: string; role?: string }) {
   const pathname = usePathname()
-  
+  const { isAllBranches } = useBranch()
+
   // Active check: exact for /, startsWith for others
   const isActive = (href: string) => {
     if (href === "/" || href === "/beranda") return pathname === "/" || pathname === "/beranda"
@@ -77,11 +95,11 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
             <p className="text-xs font-bold text-gray-700 truncate">{businessName}</p>
           )}
         </div>
-        {role === "OWNER" && (
+        {role === "OWNER" && !isAllBranches && (
           <Link
             href="/pengaturan/toko"
             className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
-            title="Pengaturan Toko & Profil"
+            title="Pengaturan Toko & IoT"
           >
             <Settings className="w-4 h-4" />
           </Link>
@@ -95,49 +113,62 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
 
       {/* Navigation Groups */}
       <nav className="flex-1 px-3 py-4 space-y-5">
-        {navGroups.map((group) => (
-          <div key={group.label ?? "home"}>
-            {group.label && (
-              <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.14em] px-2 mb-1.5">
-                {group.label}
-              </p>
-            )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                // Strict RBAC synchronization
-                if (role === 'KASIR') {
-                  const allowedKasir = ["/kasir", "/shift-closing"];
-                  if (!allowedKasir.includes(item.href)) return null;
-                } else if (role === 'MANAGER') {
-                  const allowedManager = ["/kasir", "/katalog", "/shift-closing", "/riwayat"];
-                  if (!allowedManager.includes(item.href)) return null;
-                }
+        {navGroups.map((group) => {
+          // Filter items based on active branch mode (Semua Cabang vs Cabang Spesifik)
+          const visibleItems = group.items.filter((item) => {
+            // Scope check: ALL_ONLY vs BRANCH_ONLY
+            if (isAllBranches && item.scope === "BRANCH_ONLY") return false
+            if (!isAllBranches && item.scope === "ALL_ONLY") return false
 
-                const active = isActive(item.href)
-                const IconComponent = item.icon
+            // RBAC role check
+            if (role === "KASIR") {
+              const allowedKasir = ["/kasir", "/shift-closing"]
+              if (!allowedKasir.includes(item.href)) return false
+            } else if (role === "MANAGER") {
+              const allowedManager = ["/kasir", "/katalog", "/shift-closing", "/riwayat"]
+              if (!allowedManager.includes(item.href)) return false
+            }
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                      active
-                        ? "bg-emerald-50 text-emerald-700 font-bold border-l-4 border-emerald-600 pl-2 shadow-xs"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
-                  >
-                    <IconComponent
-                      className={`h-4 w-4 shrink-0 ${
-                        active ? "text-emerald-600" : "text-gray-400"
+            return true
+          })
+
+          if (visibleItems.length === 0) return null
+
+          return (
+            <div key={group.label ?? "home"}>
+              {group.label && (
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.14em] px-2 mb-1.5">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {visibleItems.map((item) => {
+                  const active = isActive(item.href)
+                  const IconComponent = item.icon
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                        active
+                          ? "bg-emerald-50 text-emerald-700 font-bold border-l-4 border-emerald-600 pl-2 shadow-xs"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       }`}
-                    />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                )
-              })}
+                    >
+                      <IconComponent
+                        className={`h-4 w-4 shrink-0 ${
+                          active ? "text-emerald-600" : "text-gray-400"
+                        }`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* Bottom Profile / Logout */}

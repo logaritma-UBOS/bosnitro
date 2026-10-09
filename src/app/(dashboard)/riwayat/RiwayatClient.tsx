@@ -1,197 +1,394 @@
 "use client"
-import { formatNumber, formatRupiah } from '@/lib/format';
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
-import { getTransactionHistory } from "@/actions/history"
+import { useBranch } from "@/context/BranchContext"
+import BranchSelector from "@/components/branch/BranchSelector"
+import { formatRupiah } from "@/lib/format"
+import { InterlockingTransaction } from "@/types/branch"
 import { getPendingTransactions } from "@/lib/adapters/offlineQueueAdapter"
-import { calculateHistoryMetrics } from "@/lib/engines/historyEngine"
+import {
+  History,
+  TrendingUp,
+  Receipt,
+  Building2,
+  Calendar,
+  Camera,
+  ChevronDown,
+  X,
+  CreditCard,
+  Banknote,
+  QrCode,
+  ShieldCheck,
+  CheckCircle2,
+} from "lucide-react"
 
-type SaleItem = {
-  id: string
-  quantity: number
-  priceAtSale: number
-  product: { name: string }
-}
-
-type Sale = {
-  id: string
-  clientTransactionId: string
-  totalAmount: number
-  createdAt: Date
-  saleItems: SaleItem[]
-  status: "SYNCED" | "PENDING"
-}
-
-export default function RiwayatClient({ plan }: { plan?: string }) {
-  const [sales, setSales] = useState<Sale[]>([])
+export default function RiwayatClient() {
+  const { selectedBranch, selectedBranchId, isAllBranches } = useBranch()
+  const [transactions, setTransactions] = useState<InterlockingTransaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [dateFilter, setDateFilter] = useState("today")
-  const [tier, setTier] = useState<string>("Starter")
+  const [dateFilter, setDateFilter] = useState<"today" | "7d" | "30d" | "all">("today")
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
+
+  const fetchTransactions = async () => {
+    setLoading(true)
+    try {
+      const branchParam = isAllBranches ? "ALL" : selectedBranchId
+      const res = await fetch(`/api/pos/transactions?branchId=${branchParam}`)
+      const data = await res.json()
+
+      let txList: InterlockingTransaction[] = []
+      if (data.transactions && Array.isArray(data.transactions)) {
+        txList = data.transactions
+      }
+
+      // Merge pending offline transactions if any
+      const queue = getPendingTransactions()
+      const pendingTxList: InterlockingTransaction[] = queue
+        .filter((q: any) => isAllBranches || !q.branchId || q.branchId === selectedBranchId)
+        .map((q: any) => ({
+          id: q.clientTransactionId,
+          branchId: q.branchId || selectedBranchId,
+          branchName: selectedBranch.name,
+          cashierName: "Kasir (Offline)",
+          totalAmount: q.totalAmount || 0,
+          totalCostPrice: (q.totalAmount || 0) * 0.4,
+          grossProfit: (q.totalAmount || 0) * 0.6,
+          customerPlate: q.customerPlate || null,
+          customerName: q.customerName || null,
+          customerPhone: q.customerPhone || null,
+          vehiclePhotoUrl: null,
+          usedBottlePhotoUrl: null,
+          status: "COMPLETED",
+          paymentMethod: q.paymentMethod || "CASH",
+          createdAt: new Date(q.timestamp).toISOString(),
+          items: (q.cart || []).map((c: any) => ({
+            productId: c.productId || "item",
+            productName: c.name || "Item POS",
+            category: c.category || "NITROGEN",
+            quantity: c.quantity || 1,
+            price: c.price || 0,
+            costPrice: (c.price || 0) * 0.4,
+            subtotal: (c.price || 0) * (c.quantity || 1),
+          })),
+        }))
+
+      const merged = [...pendingTxList, ...txList].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+
+      setTransactions(merged)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [res, tierData] = await Promise.all([
-          getTransactionHistory(),
-          fetch("/api/user/status").then(r => r.json()).catch(() => ({ tier: "Starter" }))
-        ])
-        
-        const fetchedTier = tierData.tier || "Starter"
-        setTier(fetchedTier)
+    fetchTransactions()
+  }, [selectedBranchId, isAllBranches])
 
-        if (!res.data) return
+  // Filter based on date
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
+      const txDate = new Date(tx.createdAt)
+      const now = new Date()
 
-        const dbSales: Sale[] = res.data.map((s: any) => ({
-          ...s,
-          status: "SYNCED"
-        }))
-
-        const queue = getPendingTransactions()
-        const pendingSales: Sale[] = queue.map((q: any) => ({
-          id: q.clientTransactionId,
-          clientTransactionId: q.clientTransactionId,
-          totalAmount: q.totalAmount || 0,
-          createdAt: new Date(q.timestamp),
-          saleItems: q.cart.map((c: any) => ({
-            id: Math.random().toString(),
-            quantity: c.quantity,
-            priceAtSale: c.price,
-            product: { name: "Produk (Offline)" }
-          })),
-          status: "PENDING"
-        }))
-
-        // Merge and sort without artificial date restrictions
-        let merged = [...pendingSales, ...dbSales].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        setSales(merged)
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
+      if (dateFilter === "today") {
+        return (
+          txDate.getDate() === now.getDate() &&
+          txDate.getMonth() === now.getMonth() &&
+          txDate.getFullYear() === now.getFullYear()
+        )
+      } else if (dateFilter === "7d") {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        return txDate >= sevenDaysAgo
+      } else if (dateFilter === "30d") {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        return txDate >= thirtyDaysAgo
       }
-    }
-    fetchData()
-  }, [])
+      return true
+    })
+  }, [transactions, dateFilter])
 
-  // Filter berdasarkan tanggal
-  const filteredSales = sales.filter(sale => {
-    const saleDate = new Date(sale.createdAt);
-    const now = new Date();
-    
-    if (dateFilter === "today") {
-      return saleDate.getDate() === now.getDate() && 
-             saleDate.getMonth() === now.getMonth() && 
-             saleDate.getFullYear() === now.getFullYear();
-    } else if (dateFilter === "7d") {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      return saleDate >= sevenDaysAgo;
-    } else if (dateFilter === "30d") {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(now.getDate() - 30);
-      return saleDate >= thirtyDaysAgo;
-    }
-    return true;
-  });
+  // KPI calculations
+  const totalOmzet = useMemo(() => {
+    return filteredTransactions.reduce((acc, t) => acc + t.totalAmount, 0)
+  }, [filteredTransactions])
 
-  // Delegasikan perhitungan bisnis ke Engine (Single Source of Truth)
-  const metrics = calculateHistoryMetrics(filteredSales)
+  const totalTransaksi = filteredTransactions.length
+  const aov = totalTransaksi > 0 ? Math.round(totalOmzet / totalTransaksi) : 0
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-20 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-slate-50 flex flex-col pb-20 font-sans">
       {/* HEADER FLAT STANDAR */}
-      <div className="bg-white px-4 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200">
-        <div className="mb-4 md:mb-0">
-          <Link href="/" className="text-gray-500 hover:text-gray-700 text-sm font-semibold mb-2 inline-flex items-center gap-1">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-            Beranda
-          </Link>
-          <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Riwayat Transaksi</h1>
-        </div>
-        <div className="flex gap-2">
-          <select 
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2 cursor-pointer font-medium"
-          >
-            <option value="today">Hari Ini</option>
-            <option value="7d">7 Hari Terakhir</option>
-            <option value="30d">30 Hari Terakhir</option>
-            <option value="all">Semua Riwayat</option>
-          </select>
+      <div className="bg-white px-4 sm:px-6 lg:px-8 py-5 border-b border-slate-200">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <History className="w-4 h-4" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900">
+                {isAllBranches ? "Riwayat Transaksi - Semua Cabang (Akumulasi)" : `Riwayat Transaksi - ${selectedBranch.name}`}
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500">
+              {isAllBranches
+                ? "Seluruh catatan transaksi interlocking & penjualan terakumulasi dari seluruh gerai cabang"
+                : `Daftar transaksi interlocking kasir untuk ${selectedBranch.name} (${selectedBranch.location})`}
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="w-full sm:w-60">
+              <BranchSelector allowAll={true} />
+            </div>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="bg-white border border-slate-300 text-slate-800 text-xs sm:text-sm font-bold rounded-xl px-3 py-2.5 shadow-xs focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="today">Hari Ini</option>
+              <option value="7d">7 Hari Terakhir</option>
+              <option value="30d">30 Hari Terakhir</option>
+              <option value="all">Semua Riwayat</option>
+            </select>
+          </div>
         </div>
       </div>
-      
-      <div className="p-4 lg:px-8 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-500 font-semibold mb-1">Total Transaksi</p>
-            <p className="text-2xl font-bold text-gray-900">{metrics.totalTransaksi}</p>
+
+      {/* METRIC KPI CARDS */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Total Transaksi
+              </span>
+              <Receipt className="w-4 h-4 text-slate-400" />
+            </div>
+            <p className="text-2xl font-black text-slate-900 tabular-nums">
+              {totalTransaksi} <span className="text-xs font-normal text-slate-400">Trx</span>
+            </p>
           </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-500 font-semibold mb-1">Total Omzet</p>
-            <p className="text-2xl font-bold text-blue-700">{formatRupiah(metrics.totalOmzet)}</p>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Total Omzet
+              </span>
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className="text-2xl font-black text-emerald-700 tabular-nums">
+              {formatRupiah(totalOmzet)}
+            </p>
           </div>
-          <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-500 font-semibold mb-1">AOV</p>
-            <p className="text-2xl font-bold text-green-700">{formatRupiah(metrics.aov)}</p>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Rata-Rata Belanja (AOV)
+              </span>
+              <CreditCard className="w-4 h-4 text-blue-600" />
+            </div>
+            <p className="text-2xl font-black text-blue-800 tabular-nums">
+              {formatRupiah(aov)}
+            </p>
           </div>
         </div>
 
+        {/* TRANSACTIONS LIST */}
         {loading ? (
-          <p className="text-center text-gray-500 mt-10">Memuat data...</p>
+          <div className="p-12 text-center text-slate-400 text-sm animate-pulse">
+            Memuat transaksi cabang...
+          </div>
+        ) : filteredTransactions.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+            <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="text-sm font-bold text-slate-700">Tidak ada transaksi ditemukan</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Belum ada transaksi di cabang ini pada periode yang dipilih.
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
-            {filteredSales.map(sale => (
-              <details key={sale.id} className="bg-white rounded-xl shadow-sm border border-gray-200 group overflow-hidden">
-                <summary className="p-4 lg:px-6 flex flex-col lg:flex-row justify-between lg:items-center cursor-pointer list-none hover:bg-gray-50 transition-colors gap-3">
-                  <div className="flex items-center gap-4 min-w-[250px]">
+            {filteredTransactions.map((tx) => (
+              <details
+                key={tx.id}
+                className="bg-white rounded-3xl border border-slate-200 shadow-xs group overflow-hidden transition-all hover:border-emerald-300"
+              >
+                <summary className="p-4 sm:p-5 flex flex-col lg:flex-row justify-between lg:items-center cursor-pointer list-none hover:bg-slate-50/70 transition-colors gap-3">
+                  <div className="flex flex-wrap items-center gap-3 min-w-[280px]">
                     <div>
-                      <p className="text-sm font-bold text-gray-900">
-                        {new Date(sale.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-slate-900 text-sm">{tx.id}</span>
+                        <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                          {tx.branchName}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {new Date(tx.createdAt).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}{" "}
+                        •{" "}
+                        {new Date(tx.createdAt).toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </p>
-                      <p className="text-xs text-gray-500">{new Date(sale.createdAt).toLocaleDateString('id-ID')}</p>
                     </div>
-                    {sale.status === "PENDING" ? (
-                      <span className="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">PENDING</span>
-                    ) : (
-                      <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">SYNCED</span>
+
+                    {tx.customerPlate && (
+                      <span className="bg-yellow-50 text-yellow-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-yellow-200">
+                        Plat: {tx.customerPlate}
+                      </span>
                     )}
-                  </div>
-                  
-                  <div className="hidden lg:block flex-1 text-sm text-gray-600 truncate px-4">
-                    {sale.saleItems.map(item => `${item.quantity}x ${item.product.name}`).join(', ')}
+
+                    <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {tx.paymentMethod}
+                    </span>
                   </div>
 
-                  <div className="text-right flex justify-between lg:justify-end items-center gap-4 min-w-[150px]">
-                    <span className="lg:hidden text-xs text-gray-500">Total:</span>
-                    <p className="text-sm font-bold text-gray-900">{formatRupiah(sale.totalAmount)}</p>
-                    <svg className="w-5 h-5 text-gray-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  <div className="hidden lg:block flex-1 text-xs text-slate-600 truncate px-4">
+                    {tx.items.map((item) => `${item.quantity}x ${item.productName}`).join(", ")}
+                  </div>
+
+                  <div className="flex items-center justify-between lg:justify-end gap-4 min-w-[180px]">
+                    <div className="text-right">
+                      <p className="text-sm font-black text-slate-900 tabular-nums">
+                        {formatRupiah(tx.totalAmount)}
+                      </p>
+                      <p className="text-[10px] text-slate-400">Kasir: {tx.cashierName}</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform" />
                   </div>
                 </summary>
-                <div className="px-4 lg:px-6 pb-4 border-t border-gray-100 pt-4 bg-gray-50/50">
-                  <p className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wider">Rincian Item Terjual</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {sale.saleItems.map((item, idx) => (
-                      <div key={idx} className="flex justify-between text-sm bg-white p-3 rounded-lg border border-gray-100">
-                        <p className="text-gray-700"><span className="font-semibold">{item.quantity}x</span> {item.product.name}</p>
-                        <p className="text-gray-900 font-semibold">{formatRupiah((item.priceAtSale * item.quantity))}</p>
+
+                <div className="px-4 sm:px-6 pb-5 pt-3 border-t border-slate-100 bg-slate-50/50 space-y-4">
+                  {/* Photo Audit Section if available */}
+                  {(tx.vehiclePhotoUrl || tx.usedBottlePhotoUrl) && (
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                        <Camera className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Foto Bukti Audit Transaksi</span>
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {tx.vehiclePhotoUrl && (
+                          <div
+                            onClick={() =>
+                              setPreviewPhoto({
+                                url: tx.vehiclePhotoUrl!,
+                                title: `Foto Plat Kendaraan (${tx.customerPlate || tx.id})`,
+                              })
+                            }
+                            className="cursor-pointer group relative w-36 aspect-video rounded-xl overflow-hidden bg-black border border-slate-200"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={tx.vehiclePhotoUrl}
+                              alt="Foto Plat"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[8px] font-bold px-1 rounded text-center truncate">
+                              Plat: {tx.customerPlate || "Tercatat"}
+                            </span>
+                          </div>
+                        )}
+
+                        {tx.usedBottlePhotoUrl && (
+                          <div
+                            onClick={() =>
+                              setPreviewPhoto({
+                                url: tx.usedBottlePhotoUrl!,
+                                title: `Foto Botol Bekas Oli (${tx.id})`,
+                              })
+                            }
+                            className="cursor-pointer group relative w-36 aspect-video rounded-xl overflow-hidden bg-black border border-slate-200"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={tx.usedBottlePhotoUrl}
+                              alt="Botol Bekas"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[8px] font-bold px-1 rounded text-center truncate">
+                              Botol Bekas Oli
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    </div>
+                  )}
+
+                  {/* Items Break-down */}
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-wider">
+                      Rincian Item Penjualan
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {tx.items.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex justify-between items-center text-xs bg-white p-3 rounded-xl border border-slate-200/80"
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-800">
+                              <span className="font-bold text-emerald-700">{item.quantity}x</span>{" "}
+                              {item.productName}
+                            </p>
+                            <span className="text-[10px] text-slate-400 uppercase font-mono">
+                              {item.category}
+                            </span>
+                          </div>
+                          <p className="font-bold text-slate-900 tabular-nums">
+                            {formatRupiah(item.subtotal)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </details>
             ))}
-            {filteredSales.length === 0 && (
-              <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
-                <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                <p className="text-gray-500 font-medium">Belum ada transaksi di periode ini.</p>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      {/* MODAL PHOTO PREVIEW / ZOOM */}
+      {previewPhoto && (
+        <div
+          onClick={() => setPreviewPhoto(null)}
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl overflow-hidden max-w-xl w-full shadow-2xl border border-slate-200"
+          >
+            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-sm">{previewPhoto.title}</h3>
+              <button
+                type="button"
+                onClick={() => setPreviewPhoto(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 bg-black flex items-center justify-center max-h-[70vh]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewPhoto.url}
+                alt="Preview Audit"
+                className="max-h-[65vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { logoutUser } from "@/actions/auth"
+import { useBranch } from "@/context/BranchContext"
 import {
   Home,
   Package,
@@ -26,6 +27,7 @@ import {
 export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
   const [isMoreOpen, setIsMoreOpen] = useState(false)
   const pathname = usePathname()
+  const { isAllBranches } = useBranch()
 
   if (pathname === "/login" || pathname === "/register" || pathname === "/reset-sandi") {
     return null
@@ -41,27 +43,34 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
       isActive(path) ? "text-emerald-600 font-bold" : "text-slate-400 hover:text-slate-700"
     }`
 
-  let menuCategories = [
-    {
-      title: "KELOLA",
-      links: [
-        { label: "Tutup Shift", href: "/shift-closing", icon: Lock },
-        { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck },
-        { label: "Pelanggan CRM", href: "/crm", icon: Users },
-        { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign },
-        { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users },
-        { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store },
-      ],
-    },
-    {
-      title: "PAHAMI BISNIS",
-      links: [
-        { label: "Performa Produk", href: "/performa-produk", icon: TrendingUp },
-        { label: "Rata-rata Belanja", href: "/performa-aov", icon: BarChart3 },
-        { label: "Laporan Keuangan", href: "/laporan", icon: ReceiptText },
-      ],
-    },
+  // Base menu categories with scoping
+  const baseKelolaLinks = [
+    { label: "Tutup Shift", href: "/shift-closing", icon: Lock, scope: "BRANCH_ONLY" },
+    { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck, scope: "ALL_ONLY" },
+    { label: "Pelanggan CRM", href: "/crm", icon: Users, scope: "BOTH" },
+    { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BOTH" },
+    { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users, scope: "BRANCH_ONLY" },
+    { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BRANCH_ONLY" },
   ]
+
+  const baseBisnisLinks = [
+    { label: "Performa Produk", href: "/performa-produk", icon: TrendingUp, scope: "ALL_ONLY" },
+    { label: "Rata-rata Belanja", href: "/performa-aov", icon: BarChart3, scope: "ALL_ONLY" },
+    { label: "Laporan Keuangan", href: "/laporan", icon: ReceiptText, scope: "ALL_ONLY" },
+  ]
+
+  // Filter based on branch mode (ALL vs BRANCH)
+  const filteredKelola = baseKelolaLinks.filter((l) =>
+    isAllBranches ? l.scope !== "BRANCH_ONLY" : l.scope !== "ALL_ONLY"
+  )
+  const filteredBisnis = baseBisnisLinks.filter((l) =>
+    isAllBranches ? l.scope !== "BRANCH_ONLY" : l.scope !== "ALL_ONLY"
+  )
+
+  let menuCategories = [
+    { title: "KELOLA", links: filteredKelola },
+    { title: "PAHAMI BISNIS", links: filteredBisnis },
+  ].filter((c) => c.links.length > 0)
 
   // Strict RBAC synchronization for drawer links
   if (role === "KASIR") {
@@ -103,11 +112,19 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
           </Link>
         )}
 
-        {/* KATALOG (OWNER & MANAGER) */}
-        {(role === "OWNER" || role === "MANAGER") && (
+        {/* KATALOG (Hanya muncul jika cabang spesifik terpilih) */}
+        {!isAllBranches && (role === "OWNER" || role === "MANAGER") && (
           <Link href="/katalog" className={navItemClass("/katalog")}>
             <Package className="w-5 h-5" />
             <span className="text-[10px] font-semibold mt-1">Katalog</span>
+          </Link>
+        )}
+
+        {/* AUDIT & FRAUD (Di mode Semua Cabang menggantikan Katalog) */}
+        {isAllBranches && role === "OWNER" && (
+          <Link href="/audit-fraud" className={navItemClass("/audit-fraud")}>
+            <ShieldCheck className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-1">Audit</span>
           </Link>
         )}
 
@@ -119,22 +136,41 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
           </Link>
         )}
 
-        {/* KASIR (ALL ROLES - PROMINENT CENTER BUTTON) */}
-        <div className="flex flex-col items-center justify-center flex-1 h-full relative -top-3">
-          <Link
-            href="/kasir"
-            className="bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(16,185,129,0.35)] hover:scale-105 transition-transform active:scale-95 border-[3px] border-white"
-          >
-            <Plus className="h-6 w-6 stroke-[3]" />
-          </Link>
-          <span className="text-[10px] font-black text-emerald-600 mt-1 tracking-tight">KASIR</span>
-        </div>
+        {/* KASIR CENTER BUTTON (HANYA MUNCUL DI CABANG SPESIFIK) */}
+        {!isAllBranches ? (
+          <div className="flex flex-col items-center justify-center flex-1 h-full relative -top-3">
+            <Link
+              href="/kasir"
+              className="bg-gradient-to-tr from-emerald-600 to-emerald-400 text-white w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(16,185,129,0.35)] hover:scale-105 transition-transform active:scale-95 border-[3px] border-white"
+            >
+              <Plus className="h-6 w-6 stroke-[3]" />
+            </Link>
+            <span className="text-[10px] font-black text-emerald-600 mt-1 tracking-tight">KASIR</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center flex-1 h-full relative -top-3">
+            <Link
+              href="/riwayat"
+              className="bg-gradient-to-tr from-slate-900 to-slate-700 text-white w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(15,23,42,0.35)] hover:scale-105 transition-transform active:scale-95 border-[3px] border-white"
+            >
+              <Receipt className="h-6 w-6" />
+            </Link>
+            <span className="text-[10px] font-black text-slate-800 mt-1 tracking-tight">RIWAYAT</span>
+          </div>
+        )}
 
-        {/* RIWAYAT (OWNER & MANAGER) */}
-        {(role === "OWNER" || role === "MANAGER") && (
+        {/* RIWAYAT (Cabang spesifik) ATAU CRM (Semua cabang) */}
+        {!isAllBranches && (role === "OWNER" || role === "MANAGER") && (
           <Link href="/riwayat" className={navItemClass("/riwayat")}>
             <Receipt className="w-5 h-5" />
             <span className="text-[10px] font-semibold mt-1">Riwayat</span>
+          </Link>
+        )}
+
+        {isAllBranches && role === "OWNER" && (
+          <Link href="/crm" className={navItemClass("/crm")}>
+            <Users className="w-5 h-5" />
+            <span className="text-[10px] font-semibold mt-1">CRM</span>
           </Link>
         )}
 
@@ -173,8 +209,12 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
           >
             <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Menu Lainnya</h2>
-                <p className="text-xs text-gray-400">Hak Akses: {role}</p>
+                <h2 className="text-lg font-bold text-gray-900">
+                  {isAllBranches ? "Menu Akumulasi Pusat" : "Menu Outlet"}
+                </h2>
+                <p className="text-xs text-gray-400">
+                  Mode: <span className="font-bold text-emerald-600">{isAllBranches ? "Semua Cabang" : "Cabang Spesifik"}</span>
+                </p>
               </div>
               <button
                 type="button"
@@ -212,7 +252,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
               ))}
 
               {/* INTEGRASI TAMBAHAN (OWNER ONLY) */}
-              {role === "OWNER" && (
+              {role === "OWNER" && !isAllBranches && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-2">
                     INTEGRASI & SISTEM

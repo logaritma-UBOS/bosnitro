@@ -175,11 +175,13 @@ export default function OwnerDashboardInterlockingClient({
               <BarChart3 className="w-5 h-5" />
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-              Dashboard Eksekutif Anti-Loss
+              {isAllBranches ? "Dashboard Eksekutif Anti-Loss (Semua Cabang)" : `Dashboard Operasional - ${selectedBranch.name}`}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
-            Monitoring live feed 4 cabang, evaluasi target 30 hari & sistem reward, interlocking IoT & audit visual
+            {isAllBranches
+              ? "Monitoring live feed 4 cabang, evaluasi target 30 hari & sistem reward, interlocking IoT & audit visual"
+              : `Ringkasan analisis penjualan 30 hari dan omzet harian ${selectedBranch.name} (${selectedBranch.location})`}
           </p>
         </div>
 
@@ -355,76 +357,78 @@ export default function OwnerDashboardInterlockingClient({
         </div>
       )}
 
-      {/* MULTI-BRANCH OVERVIEW CARDS (Image 2 Blueprint: 4 Cabang) */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Building2 className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                Live Feed Seluruh Cabang ({branches.length} Outlet Aktif)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Performa harian per outlet sesuai arsitektur Image 2
-              </p>
+      {/* MULTI-BRANCH OVERVIEW CARDS (Image 2 Blueprint: 4 Cabang - Konsolidasi Semua Cabang) */}
+      {isAllBranches && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Live Feed Seluruh Cabang ({branches.length} Outlet Aktif)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Performa harian per outlet sesuai arsitektur Image 2
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {branchCardsData.map((bItem, idx) => (
-            <div
-              key={bItem.branch.id}
-              className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 hover:shadow-md transition-all"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <h3 className="text-sm font-extrabold text-slate-900 truncate">
-                      {bItem.branch.name}
-                    </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {branchCardsData.map((bItem, idx) => (
+              <div
+                key={bItem.branch.id}
+                className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 hover:shadow-md transition-all"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <h3 className="text-sm font-extrabold text-slate-900 truncate">
+                        {bItem.branch.name}
+                      </h3>
+                    </div>
+                    <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                      Online
+                    </span>
                   </div>
-                  <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                    Online
+
+                  <div className="space-y-2 mb-4">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Omzet Riil</span>
+                      <p className="text-xl font-black text-slate-900 tabular-nums">
+                        {formatRupiah(bItem.revenue)}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
+                      <div>
+                        <span className="text-slate-400 text-[10px]">Trx Nitrogen</span>
+                        <p className="font-bold text-emerald-700">{bItem.nitrogenCount} ban</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px]">Unit Oli</span>
+                        <p className="font-bold text-blue-700">{bItem.oliCount} botol</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="font-mono text-[10px] text-slate-400">
+                    {bItem.branch.deviceId || `ESP32-${idx + 1}`}
+                  </span>
+                  <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg text-[10px]">
+                    Valve Ready
                   </span>
                 </div>
-
-                <div className="space-y-2 mb-4">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Omzet Riil</span>
-                    <p className="text-xl font-black text-slate-900 tabular-nums">
-                      {formatRupiah(bItem.revenue)}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
-                    <div>
-                      <span className="text-slate-400 text-[10px]">Trx Nitrogen</span>
-                      <p className="font-bold text-emerald-700">{bItem.nitrogenCount} ban</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px]">Unit Oli</span>
-                      <p className="font-bold text-blue-700">{bItem.oliCount} botol</p>
-                    </div>
-                  </div>
-                </div>
               </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <span className="font-mono text-[10px] text-slate-400">
-                  {bItem.branch.deviceId || `ESP32-${idx + 1}`}
-                </span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg text-[10px]">
-                  Valve Ready
-                </span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -515,204 +519,208 @@ export default function OwnerDashboardInterlockingClient({
         </div>
       </div>
 
-      {/* FRAUD CONTROL & ANOMALY ALERTS WIDGET (Image 2: Telegram Fraud Alert Log) */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4" />
+      {/* FRAUD CONTROL & ANOMALY ALERTS WIDGET (Image 2: Telegram Fraud Alert Log - Khusus Semua Cabang) */}
+      {isAllBranches && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Log Peringatan Fraud Telegram (Real-Time Sensor Anomaly)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Pemberitahuan otomatis ke bot Telegram owner saat terdeteksi anomali hardware atau selisih kasir
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                Log Peringatan Fraud Telegram (Real-Time Sensor Anomaly)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Pemberitahuan otomatis ke bot Telegram owner saat terdeteksi anomali hardware atau selisih kasir
-              </p>
-            </div>
+
+            <span
+              className={`text-xs font-black px-3 py-1 rounded-full ${
+                filteredAlerts.length > 0 ? "bg-red-100 text-red-800 animate-pulse" : "bg-emerald-100 text-emerald-800"
+              }`}
+            >
+              {filteredAlerts.length > 0 ? `${filteredAlerts.length} Anomali Terdeteksi` : "Aman / Normal"}
+            </span>
           </div>
 
-          <span
-            className={`text-xs font-black px-3 py-1 rounded-full ${
-              filteredAlerts.length > 0 ? "bg-red-100 text-red-800 animate-pulse" : "bg-emerald-100 text-emerald-800"
-            }`}
-          >
-            {filteredAlerts.length > 0 ? `${filteredAlerts.length} Anomali Terdeteksi` : "Aman / Normal"}
-          </span>
-        </div>
-
-        {filteredAlerts.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs">
-            Tidak ada anomali sensor pada cabang ini. Sistem pengisian berjalan tertib.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="bg-red-50/70 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertCircle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-red-900">{alert.branchName}</span>
-                      <span className="text-[10px] font-mono bg-red-200/60 text-red-800 px-1.5 py-0.5 rounded">
-                        {alert.deviceId}
-                      </span>
+          {filteredAlerts.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              Tidak ada anomali sensor pada cabang ini. Sistem pengisian berjalan tertib.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="bg-red-50/70 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <AlertCircle className="w-4 h-4" />
                     </div>
-                    <p className="text-xs font-semibold text-red-800 mt-1">{alert.message}</p>
-                    <p className="text-[10px] text-red-500 mt-0.5">
-                      Waktu Deteksi: {new Date(alert.detectedAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-red-900">{alert.branchName}</span>
+                        <span className="text-[10px] font-mono bg-red-200/60 text-red-800 px-1.5 py-0.5 rounded">
+                          {alert.deviceId}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-red-800 mt-1">{alert.message}</p>
+                      <p className="text-[10px] text-red-500 mt-0.5">
+                        Waktu Deteksi: {new Date(alert.detectedAt).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-xl">
-                    Telegram Terkirim ✓
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* VISUAL AUDIT GALLERY (Image 2: Live Fraud & Audit Stream) */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <Camera className="w-4 h-4" />
-              </div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                Live Audit & Foto Bukti Transaksi
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Setiap struk diverifikasi dengan foto plat nomor kendaraan & foto botol oli bekas yang diganti
-            </p>
-          </div>
-
-          <Link
-            href="/shift-closing"
-            className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 self-start sm:self-auto"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Lihat Audit Shift Closing</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {filteredTransactions.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 text-xs">
-            Belum ada transaksi dengan bukti foto audit di cabang ini.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTransactions.slice(0, 9).map((tx) => (
-              <div
-                key={tx.id}
-                className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-300 transition-all hover:shadow-xs"
-              >
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="font-mono font-bold text-slate-800">{tx.id}</span>
-                    <span className="text-[10px] font-bold bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded-md">
-                      {tx.branchName}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-xl">
+                      Telegram Terkirim ✓
                     </span>
                   </div>
-
-                  <p className="text-[11px] text-slate-500 mb-3">
-                    Kasir: <span className="font-semibold text-slate-700">{tx.cashierName}</span> • {new Date(tx.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-
-                  {/* Photo Badges / Previews */}
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {tx.vehiclePhotoUrl ? (
-                      <div
-                        onClick={() =>
-                          setPreviewPhoto({
-                            url: tx.vehiclePhotoUrl!,
-                            title: `Foto Plat Kendaraan (${tx.customerPlate || tx.id})`,
-                          })
-                        }
-                        className="cursor-pointer group relative aspect-video rounded-xl overflow-hidden bg-black border border-slate-300"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={tx.vehiclePhotoUrl}
-                          alt="Plat Nomor"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded text-center truncate">
-                          Plat: {tx.customerPlate || "Tercatat"}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400">
-                        Tanpa Nitrogen
-                      </div>
-                    )}
-
-                    {tx.usedBottlePhotoUrl ? (
-                      <div
-                        onClick={() =>
-                          setPreviewPhoto({
-                            url: tx.usedBottlePhotoUrl!,
-                            title: `Foto Botol Bekas Oli (${tx.id})`,
-                          })
-                        }
-                        className="cursor-pointer group relative aspect-video rounded-xl overflow-hidden bg-black border border-slate-300"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={tx.usedBottlePhotoUrl}
-                          alt="Botol Bekas"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                        <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded text-center truncate">
-                          Botol Bekas Oli
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400">
-                        Tanpa Ritel
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Items summary */}
-                  <div className="text-[11px] text-slate-600 space-y-0.5">
-                    {tx.items.map((it, idx) => (
-                      <div key={idx} className="flex justify-between">
-                        <span className="truncate">
-                          {it.quantity}x {it.productName}
-                        </span>
-                        <span className="font-semibold tabular-nums">{formatRupiah(it.subtotal)}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-                <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex justify-between items-center text-xs">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    <CheckCircle2 className="w-3 h-3" />
-                    <span>Valid Interlocked</span>
-                  </span>
-                  <span className="font-black text-slate-900 tabular-nums">
-                    {formatRupiah(tx.totalAmount)}
-                  </span>
+      {/* VISUAL AUDIT GALLERY (Image 2: Live Fraud & Audit Stream - Khusus Semua Cabang) */}
+      {isAllBranches && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Camera className="w-4 h-4" />
                 </div>
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Live Audit & Foto Bukti Transaksi
+                </h2>
               </div>
-            ))}
+              <p className="text-xs text-slate-500 mt-0.5">
+                Setiap struk diverifikasi dengan foto plat nomor kendaraan & foto botol oli bekas yang diganti
+              </p>
+            </div>
+
+            <Link
+              href="/shift-closing"
+              className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Lihat Audit Shift Closing</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-        )}
-      </div>
+
+          {filteredTransactions.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              Belum ada transaksi dengan bukti foto audit di cabang ini.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTransactions.slice(0, 9).map((tx) => (
+                <div
+                  key={tx.id}
+                  className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-300 transition-all hover:shadow-xs"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="font-mono font-bold text-slate-800">{tx.id}</span>
+                      <span className="text-[10px] font-bold bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded-md">
+                        {tx.branchName}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 mb-3">
+                      Kasir: <span className="font-semibold text-slate-700">{tx.cashierName}</span> • {new Date(tx.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+
+                    {/* Photo Badges / Previews */}
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {tx.vehiclePhotoUrl ? (
+                        <div
+                          onClick={() =>
+                            setPreviewPhoto({
+                              url: tx.vehiclePhotoUrl!,
+                              title: `Foto Plat Kendaraan (${tx.customerPlate || tx.id})`,
+                            })
+                          }
+                          className="cursor-pointer group relative aspect-video rounded-xl overflow-hidden bg-black border border-slate-300"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={tx.vehiclePhotoUrl}
+                            alt="Plat Nomor"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded text-center truncate">
+                            Plat: {tx.customerPlate || "Tercatat"}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400">
+                          Tanpa Nitrogen
+                        </div>
+                      )}
+
+                      {tx.usedBottlePhotoUrl ? (
+                        <div
+                          onClick={() =>
+                            setPreviewPhoto({
+                              url: tx.usedBottlePhotoUrl!,
+                              title: `Foto Botol Bekas Oli (${tx.id})`,
+                            })
+                          }
+                          className="cursor-pointer group relative aspect-video rounded-xl overflow-hidden bg-black border border-slate-300"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={tx.usedBottlePhotoUrl}
+                            alt="Botol Bekas"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <span className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[9px] font-bold px-1.5 py-0.5 rounded text-center truncate">
+                            Botol Bekas Oli
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="aspect-video rounded-xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400">
+                          Tanpa Ritel
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Items summary */}
+                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                      {tx.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between">
+                          <span className="truncate">
+                            {it.quantity}x {it.productName}
+                          </span>
+                          <span className="font-semibold tabular-nums">{formatRupiah(it.subtotal)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-200/70 flex justify-between items-center text-xs">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Valid Interlocked</span>
+                    </span>
+                    <span className="font-black text-slate-900 tabular-nums">
+                      {formatRupiah(tx.totalAmount)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* MODAL PHOTO PREVIEW / ZOOM */}
       {previewPhoto && (

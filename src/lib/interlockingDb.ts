@@ -96,8 +96,8 @@ export async function deleteBranch(id: string): Promise<boolean> {
   return true
 }
 
-// In-memory / persistent runtime store for fast reactivity & offline-first capability
-let runtimeProducts: InterlockingProduct[] = [
+// Base catalog template for initial branch seeding
+const BASE_PRODUCTS_TEMPLATE: InterlockingProduct[] = [
   // 1. LAYANAN NITROGEN (IoT Trigger - Motor & Mobil)
   {
     id: "nitro-motor-baru",
@@ -322,6 +322,21 @@ let runtimeProducts: InterlockingProduct[] = [
   },
 ]
 
+// Per-branch products catalog to guarantee complete isolation of prices, timers, and stock
+const branchProductsMap: Record<string, InterlockingProduct[]> = {}
+
+export function getBranchProductsList(branchId?: string): InterlockingProduct[] {
+  const targetId = (!branchId || branchId === "ALL") ? "branch-utama" : branchId
+  if (!branchProductsMap[targetId]) {
+    // Clone base template with this branch's unique branchId
+    branchProductsMap[targetId] = BASE_PRODUCTS_TEMPLATE.map(p => ({
+      ...p,
+      branchId: targetId
+    }))
+  }
+  return branchProductsMap[targetId]
+}
+
 let runtimeTransactions: InterlockingTransaction[] = [
   // Transaksi Live Hari Ini (Sesuai Gambar 2)
   {
@@ -479,30 +494,33 @@ export async function getProducts(branchId?: string): Promise<InterlockingProduc
   try {
     const { data, error } = await supabase.from("products").select("*")
     if (!error && data && data.length > 0) {
-      return data.map((d: any) => ({
-        id: d.id,
-        branchId: d.branch_id,
-        category: d.category,
-        vehicleType: d.vehicle_type,
-        serviceType: d.service_type,
-        name: d.name,
-        price: Number(d.price),
-        costPrice: Number(d.cost_price || 0),
-        stock: Number(d.stock || 0),
-        barcode: d.barcode,
-        timerSeconds: d.timer_seconds,
-        requiresPhoto: d.requires_photo ?? true,
-        imageUrl: d.image_url,
-        isActive: d.is_active ?? true,
-      }))
+      return data
+        .filter((d: any) => !branchId || branchId === "ALL" || d.branch_id === branchId)
+        .map((d: any) => ({
+          id: d.id,
+          branchId: d.branch_id,
+          category: d.category,
+          vehicleType: d.vehicle_type,
+          serviceType: d.service_type,
+          name: d.name,
+          price: Number(d.price),
+          costPrice: Number(d.cost_price || 0),
+          stock: Number(d.stock || 0),
+          barcode: d.barcode,
+          timerSeconds: d.timer_seconds,
+          requiresPhoto: d.requires_photo ?? true,
+          imageUrl: d.image_url,
+          isActive: d.is_active ?? true,
+        }))
     }
   } catch (e) {}
 
-  return runtimeProducts.filter(p => !p.branchId || !branchId || p.branchId === branchId)
+  return getBranchProductsList(branchId)
 }
 
-export async function updateNitrogenItem(id: string, price: number, timerSeconds: number) {
-  const item = runtimeProducts.find(p => p.id === id)
+export async function updateNitrogenItem(id: string, price: number, timerSeconds: number, branchId?: string) {
+  const products = getBranchProductsList(branchId)
+  const item = products.find(p => p.id === id)
   if (item) {
     item.price = price
     item.timerSeconds = timerSeconds
@@ -524,15 +542,18 @@ export async function saveRetailProduct(data: {
   stock: number
   branchId?: string
 }) {
+  const targetBranch = data.branchId || "branch-utama"
+  const products = getBranchProductsList(targetBranch)
+
   if (data.id) {
-    const existing = runtimeProducts.find(p => p.id === data.id)
+    const existing = products.find(p => p.id === data.id)
     if (existing) {
       existing.name = data.name
       existing.barcode = data.barcode
       existing.price = data.price
       existing.costPrice = data.costPrice
       existing.stock = data.stock
-      if (data.branchId) existing.branchId = data.branchId
+      existing.branchId = targetBranch
       return existing
     }
   }
@@ -549,11 +570,11 @@ export async function saveRetailProduct(data: {
     stock: data.stock,
     timerSeconds: 0,
     requiresPhoto: true,
-    branchId: data.branchId,
+    branchId: targetBranch,
     isActive: true
   }
 
-  runtimeProducts.push(newProd)
+  products.push(newProd)
   return newProd
 }
 
@@ -578,16 +599,17 @@ export async function recordTransaction(payload: {
 }): Promise<InterlockingTransaction> {
   const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
-  // Deduct retail / service stock
+  // Deduct retail / service stock from that branch's inventory
+  const branchProds = getBranchProductsList(payload.branchId)
   for (const item of payload.items) {
-    const product = runtimeProducts.find(p => p.id === item.productId)
+    const product = branchProds.find(p => p.id === item.productId)
     if (product && (product.category === "RETAIL" || product.category === "LAYANAN_LAINNYA")) {
       product.stock = Math.max(0, product.stock - item.quantity)
     }
   }
 
   const transactionItems = payload.items.map(item => {
-    const prod = runtimeProducts.find(p => p.id === item.productId)
+    const prod = branchProds.find(p => p.id === item.productId)
     return {
       productId: item.productId,
       productName: prod?.name || "Layanan/Barang",
@@ -744,3 +766,119 @@ export async function getShiftClosings(branchId?: string): Promise<ShiftClosing[
   }
   return runtimeShiftClosings.filter(s => s.branchId === branchId)
 }
+
+// -------------------------------------------------------------
+// BRANCH-SCOPED EMPLOYEE & ACCESS MANAGEMENT (PEGAWAI)
+// -------------------------------------------------------------
+export type BranchStaff = {
+  id: string
+  branchId: string
+  branchName: string
+  name: string
+  email: string
+  role: "KASIR" | "MANAGER"
+  phone?: string
+  createdAt: string
+}
+
+let runtimeStaffs: BranchStaff[] = [
+  // Cabang Tambun
+  {
+    id: "staff-tambun-1",
+    branchId: "branch-utama",
+    branchName: "Cabang Tambun",
+    name: "Budi Santoso",
+    email: "budi.tambun@ubos.id",
+    role: "KASIR",
+    phone: "081234567891",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "staff-tambun-2",
+    branchId: "branch-utama",
+    branchName: "Cabang Tambun",
+    name: "Joko Widodo",
+    email: "joko.tambun@ubos.id",
+    role: "MANAGER",
+    phone: "081234567892",
+    createdAt: new Date().toISOString(),
+  },
+  // Cabang Cibitung 1
+  {
+    id: "staff-cibitung1-1",
+    branchId: "branch-cibitung-1",
+    branchName: "Cabang Cibitung 1",
+    name: "Rian Hidayat",
+    email: "rian.cibitung1@ubos.id",
+    role: "KASIR",
+    phone: "085712345678",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "staff-cibitung1-2",
+    branchId: "branch-cibitung-1",
+    branchName: "Cabang Cibitung 1",
+    name: "Agus Setiawan",
+    email: "agus.cibitung1@ubos.id",
+    role: "MANAGER",
+    phone: "085712345679",
+    createdAt: new Date().toISOString(),
+  },
+  // Cabang Cibitung 2
+  {
+    id: "staff-cibitung2-1",
+    branchId: "branch-cibitung-2",
+    branchName: "Cabang Cibitung 2",
+    name: "Doni Pratama",
+    email: "doni.cibitung2@ubos.id",
+    role: "KASIR",
+    phone: "087890123456",
+    createdAt: new Date().toISOString(),
+  },
+  // Cabang Cibitung 3
+  {
+    id: "staff-cibitung3-1",
+    branchId: "branch-cibitung-3",
+    branchName: "Cabang Cibitung 3",
+    name: "Andi Saputra",
+    email: "andi.cibitung3@ubos.id",
+    role: "KASIR",
+    phone: "081398765432",
+    createdAt: new Date().toISOString(),
+  },
+]
+
+export async function getStaffListByBranch(branchId?: string): Promise<BranchStaff[]> {
+  if (!branchId || branchId === "ALL") {
+    return runtimeStaffs
+  }
+  return runtimeStaffs.filter(s => s.branchId === branchId)
+}
+
+export async function createStaffForBranch(data: {
+  branchId: string
+  name: string
+  email: string
+  role: "KASIR" | "MANAGER"
+  phone?: string
+}): Promise<BranchStaff> {
+  const branch = runtimeBranches.find(b => b.id === data.branchId) || DEFAULT_BRANCHES.find(b => b.id === data.branchId) || { id: data.branchId, name: "Cabang Outlet", location: "" }
+  const newStaff: BranchStaff = {
+    id: `staff-${Date.now()}`,
+    branchId: data.branchId,
+    branchName: branch.name,
+    name: data.name.trim(),
+    email: data.email.trim(),
+    role: data.role,
+    phone: data.phone?.trim() || undefined,
+    createdAt: new Date().toISOString(),
+  }
+  runtimeStaffs.push(newStaff)
+  return newStaff
+}
+
+export async function deleteStaffFromBranch(staffId: string): Promise<boolean> {
+  runtimeStaffs = runtimeStaffs.filter(s => s.id !== staffId)
+  return true
+}
+

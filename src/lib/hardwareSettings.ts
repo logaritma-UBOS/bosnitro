@@ -46,17 +46,61 @@ const DEFAULT_HARDWARE_SETTINGS: HardwareSettings = {
   rewardNotes: "Bonus apresiasi tim cabang per bulan jika rata-rata omzet harian 30 hari melampaui target.",
 }
 
-// Runtime in-memory store
-let runtimeHardwareSettings: HardwareSettings = { ...DEFAULT_HARDWARE_SETTINGS }
-
-export async function getHardwareSettings(): Promise<HardwareSettings> {
-  return runtimeHardwareSettings
+// Multi-tenant in-memory hardware configuration map keyed by branchId
+const branchHardwareMap: Record<string, HardwareSettings> = {
+  "branch-utama": {
+    ...DEFAULT_HARDWARE_SETTINGS,
+    esp32Ip: "192.168.1.150:81",
+    esp32WsUrl: "ws://192.168.1.150:81",
+    esp32Token: "UBOS-TAMBUN-KEY-8899",
+    cctvSnapshotUrl: "http://192.168.1.180/cgi-bin/snapshot.cgi",
+    bluetoothPrinterName: "RPP02N-TAMBUN",
+  },
+  "branch-cibitung-1": {
+    ...DEFAULT_HARDWARE_SETTINGS,
+    esp32Ip: "192.168.2.150:81",
+    esp32WsUrl: "ws://192.168.2.150:81",
+    esp32Token: "UBOS-CIBITUNG1-KEY-8899",
+    cctvSnapshotUrl: "http://192.168.2.180/cgi-bin/snapshot.cgi",
+    bluetoothPrinterName: "RPP02N-CIBITUNG1",
+  },
+  "branch-cibitung-2": {
+    ...DEFAULT_HARDWARE_SETTINGS,
+    esp32Ip: "192.168.3.150:81",
+    esp32WsUrl: "ws://192.168.3.150:81",
+    esp32Token: "UBOS-CIBITUNG2-KEY-8899",
+    cctvSnapshotUrl: "http://192.168.3.180/cgi-bin/snapshot.cgi",
+    bluetoothPrinterName: "RPP02N-CIBITUNG2",
+  },
+  "branch-cibitung-3": {
+    ...DEFAULT_HARDWARE_SETTINGS,
+    esp32Ip: "192.168.4.150:81",
+    esp32WsUrl: "ws://192.168.4.150:81",
+    esp32Token: "UBOS-CIBITUNG3-KEY-8899",
+    cctvSnapshotUrl: "http://192.168.4.180/cgi-bin/snapshot.cgi",
+    bluetoothPrinterName: "RPP02N-CIBITUNG3",
+  },
 }
 
-export async function updateHardwareSettings(data: Partial<HardwareSettings>): Promise<HardwareSettings> {
-  runtimeHardwareSettings = {
-    ...runtimeHardwareSettings,
+export async function getHardwareSettings(branchId?: string | null): Promise<HardwareSettings> {
+  const targetId = branchId && branchId !== "ALL" ? branchId : "branch-utama"
+  if (!branchHardwareMap[targetId]) {
+    branchHardwareMap[targetId] = { ...DEFAULT_HARDWARE_SETTINGS }
+  }
+  return branchHardwareMap[targetId]
+}
+
+export async function updateHardwareSettings(
+  data: Partial<HardwareSettings>,
+  branchId?: string | null
+): Promise<HardwareSettings> {
+  const targetId = branchId && branchId !== "ALL" ? branchId : "branch-utama"
+  if (!branchHardwareMap[targetId]) {
+    branchHardwareMap[targetId] = { ...DEFAULT_HARDWARE_SETTINGS }
+  }
+  branchHardwareMap[targetId] = {
+    ...branchHardwareMap[targetId],
     ...data,
   }
-  return runtimeHardwareSettings
+  return branchHardwareMap[targetId]
 }
