@@ -34,6 +34,7 @@ import {
   Zap,
   Play,
   Check,
+  Cloud,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -91,6 +92,19 @@ export default function StoreSettingsClient({
   const [printerTestResult, setPrinterTestResult] = useState<string | null>(null)
   const [testingPrinter, setTestingPrinter] = useState(false)
 
+  // Cloudinary state
+  const [cloudinaryApiSecret, setCloudinaryApiSecret] = useState("")
+  const [cloudinaryUploadPreset, setCloudinaryUploadPreset] = useState("")
+  const [cloudinaryStatus, setCloudinaryStatus] = useState<{
+    cloudName: string
+    apiKey: string
+    hasSecret: boolean
+    hasPreset: boolean
+    isConfigured: boolean
+  } | null>(null)
+  const [savingCloudinary, setSavingCloudinary] = useState(false)
+  const [cloudinaryFeedback, setCloudinaryFeedback] = useState<string | null>(null)
+
   // Test telegram state
   const [testingTelegram, setTestingTelegram] = useState(false)
   const [telegramTestResult, setTelegramTestResult] = useState<{
@@ -103,6 +117,18 @@ export default function StoreSettingsClient({
 
   // Add branch modal state
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false)
+
+  // Load Cloudinary status on mount
+  useEffect(() => {
+    fetch("/api/cloudinary/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success) {
+          setCloudinaryStatus(data)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   // Load hardware settings per selected branch (Isolated per branch)
   useEffect(() => {
@@ -197,6 +223,17 @@ export default function StoreSettingsClient({
 
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Gagal menyimpan hardware settings")
+
+      if (cloudinaryApiSecret || cloudinaryUploadPreset) {
+        await fetch("/api/cloudinary/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            apiSecret: cloudinaryApiSecret || undefined,
+            uploadPreset: cloudinaryUploadPreset || undefined,
+          }),
+        }).catch(console.error)
+      }
 
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
@@ -848,6 +885,112 @@ export default function StoreSettingsClient({
                     {printerTestResult}
                   </p>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* SUB-PANEL 4: CLOUDINARY MEDIA CLOUD STORAGE */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                  <Cloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Cloudinary Media Cloud Storage</h3>
+                  <p className="text-[10px] text-slate-500">Penyimpanan Media Foto Audit CCTV, Struk & Foto Produk</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Tersinkronisasi
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-xs">
+                <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                  <span className="text-[11px] font-bold text-slate-500">Cloud Name:</span>
+                  <span className="font-mono font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 text-xs">
+                    {cloudinaryStatus?.cloudName || "eiwfpdb2"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+                  <span className="text-[11px] font-bold text-slate-500">API Key:</span>
+                  <span className="font-mono font-bold text-slate-900 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200 text-xs">
+                    {cloudinaryStatus?.apiKey || "296696875898832"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-[11px] font-bold text-slate-500">Status Server:</span>
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-700 text-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Tersinkronisasi & Siap Digunakan
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    API Secret (Opsional untuk Direct Signed Upload)
+                  </label>
+                  <input
+                    type="password"
+                    value={cloudinaryApiSecret}
+                    onChange={(e) => setCloudinaryApiSecret(e.target.value)}
+                    placeholder={cloudinaryStatus?.hasSecret ? "•••••••••••••••••••••••••••••• (Tersimpan)" : "Masukkan API Secret (jika ada)..."}
+                    className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-xl"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {cloudinaryStatus?.hasSecret
+                      ? "API Secret aktif terpasang untuk signed direct upload ke Cloudinary."
+                      : "Jika API Secret belum diisi, foto tetap aman tersimpan via fallback local/base64 tanpa hambatan."}
+                  </p>
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <button
+                    type="button"
+                    disabled={savingCloudinary}
+                    onClick={async () => {
+                      setSavingCloudinary(true)
+                      setCloudinaryFeedback(null)
+                      try {
+                        const res = await fetch("/api/cloudinary/config", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            apiSecret: cloudinaryApiSecret || undefined,
+                            uploadPreset: cloudinaryUploadPreset || undefined,
+                          }),
+                        })
+                        const data = await res.json()
+                        if (data.success) {
+                          setCloudinaryStatus(data)
+                          setCloudinaryFeedback("Konfigurasi Cloudinary berhasil disimpan!")
+                        } else {
+                          setCloudinaryFeedback("Gagal menyimpan konfigurasi.")
+                        }
+                      } catch (err: any) {
+                        setCloudinaryFeedback("Error: " + err.message)
+                      } finally {
+                        setSavingCloudinary(false)
+                        setTimeout(() => setCloudinaryFeedback(null), 3000)
+                      }
+                    }}
+                    className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors"
+                  >
+                    {savingCloudinary ? "Menyimpan..." : "Simpan Kunci Cloudinary"}
+                  </button>
+                  {cloudinaryFeedback && (
+                    <span className="text-[11px] font-bold text-emerald-600">
+                      {cloudinaryFeedback}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
