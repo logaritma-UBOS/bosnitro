@@ -412,6 +412,16 @@ export default function KasirInterlockingClient({
               <LogOut size={13} />
               <span>Tutup Shift</span>
             </Link>
+            {user?.role !== "KASIR" && (
+              <Link
+                href="/beranda"
+                className="px-2.5 py-1 md:px-3 md:py-1.5 bg-black/25 hover:bg-black/35 text-white rounded-lg text-xs md:text-sm font-bold transition-colors flex items-center space-x-1 shadow-xs"
+                title="Kembali ke Dashboard Owner"
+              >
+                <ChevronLeft size={14} />
+                <span>Dashboard</span>
+              </Link>
+            )}
           </div>
         </div>
 

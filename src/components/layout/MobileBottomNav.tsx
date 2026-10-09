@@ -29,7 +29,13 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
   const pathname = usePathname()
   const { isAllBranches } = useBranch()
 
-  if (pathname === "/login" || pathname === "/register" || pathname === "/reset-sandi") {
+  if (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/reset-sandi" ||
+    pathname === "/kasir" ||
+    pathname?.startsWith("/kasir")
+  ) {
     return null
   }
 

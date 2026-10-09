@@ -80,6 +80,11 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
   const pathname = usePathname()
   const { isAllBranches } = useBranch()
 
+  // Sembunyikan sidebar pada layar POS kasir
+  if (pathname === "/kasir" || pathname?.startsWith("/kasir")) {
+    return null
+  }
+
   // Active check: exact for /, startsWith for others
   const isActive = (href: string) => {
     if (href === "/" || href === "/beranda") return pathname === "/" || pathname === "/beranda"

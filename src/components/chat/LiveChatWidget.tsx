@@ -1,14 +1,20 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { sendMessage, getChatHistory, getUnreadAdminMessages, markMessagesAsRead } from "@/actions/chat";
+import { usePathname } from "next/navigation";
 
 export default function LiveChatWidget({ userId }: { userId: string }) {
+    const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<any[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const endRef = useRef<HTMLDivElement>(null);
+
+    if (pathname === "/kasir" || pathname?.startsWith("/kasir")) {
+        return null;
+    }
 
     const fetchMessages = async () => {
         const res = await getChatHistory(userId);
