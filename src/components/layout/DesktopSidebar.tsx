@@ -46,8 +46,8 @@ const navGroups: NavGroup[] = [
     label: "Operasional & Jualan",
     items: [
       // Menu khusus cabang fisik
-      { label: "Kasir POS", href: "/kasir", icon: Receipt, scope: "BRANCH_ONLY" },
-      { label: "Tutup Shift", href: "/shift-closing", icon: Lock, scope: "BRANCH_ONLY" },
+      //{ label: "Kasir POS", href: "/kasir", icon: Receipt, scope: "BRANCH_ONLY" },
+      //{ label: "Tutup Shift", href: "/shift-closing", icon: Lock, scope: "BRANCH_ONLY" },
       { label: "Riwayat", href: "/riwayat", icon: History, scope: "BOTH" },
       // Audit & Fraud hanya ada di Semua Cabang (Level Pusat)
       { label: "Audit & Fraud", href: "/audit-fraud", icon: ShieldCheck, scope: "ALL_ONLY" },
