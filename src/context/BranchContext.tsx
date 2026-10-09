@@ -11,6 +11,8 @@ type BranchContextType = {
   isAllBranches: boolean
   setIsAllBranches: (val: boolean) => void
   addBranch: (newBranch: Branch) => void
+  updateBranchState: (updated: Branch) => void
+  deleteBranchState: (id: string) => void
   refreshBranches: () => Promise<void>
 }
 
@@ -83,6 +85,20 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     setSelectedBranchId(newBranch.id)
   }
 
+  const updateBranchState = (updated: Branch) => {
+    setBranches(prev => prev.map(b => b.id === updated.id ? updated : b))
+  }
+
+  const deleteBranchState = (id: string) => {
+    setBranches(prev => {
+      const next = prev.filter(b => b.id !== id)
+      if (selectedBranchId === id && next.length > 0) {
+        setSelectedBranchId(next[0].id)
+      }
+      return next
+    })
+  }
+
   const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0] || DEFAULT_BRANCHES[0]
 
   return (
@@ -95,6 +111,8 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         isAllBranches,
         setIsAllBranches,
         addBranch,
+        updateBranchState,
+        deleteBranchState,
         refreshBranches,
       }}
     >

@@ -2,9 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useBranch } from "@/context/BranchContext"
-import { InterlockingTransaction, FraudAlert, Analytics30Days } from "@/types/branch"
+import { InterlockingTransaction, FraudAlert, Analytics30Days, Branch } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
 import BranchSelector from "@/components/branch/BranchSelector"
+import AddBranchModal from "@/components/branch/AddBranchModal"
+import EditBranchModal from "@/components/branch/EditBranchModal"
 import Link from "next/link"
 import {
   BarChart3,
@@ -32,6 +34,10 @@ import {
   Check,
   ChevronRight,
   Flame,
+  MapPin,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react"
 
 export default function OwnerDashboardInterlockingClient({
@@ -43,10 +49,14 @@ export default function OwnerDashboardInterlockingClient({
   initialAlerts: FraudAlert[]
   initialTelegramPhone?: string
 }) {
-  const { branches, selectedBranch, selectedBranchId, isAllBranches } = useBranch()
+  const { branches, selectedBranch, selectedBranchId, isAllBranches, deleteBranchState, refreshBranches } = useBranch()
   const [transactions] = useState<InterlockingTransaction[]>(initialTransactions)
   const [alerts] = useState<FraudAlert[]>(initialAlerts)
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
+
+  // Branch Management Modal States
+  const [isAddBranchOpen, setIsAddBranchOpen] = useState(false)
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
 
   // 30-Day Analytics & Reward State
   const [analytics30Days, setAnalytics30Days] = useState<Analytics30Days | null>(null)
@@ -116,6 +126,29 @@ export default function OwnerDashboardInterlockingClient({
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2500)
+  }
+
+  const handleDeleteBranch = async (branchId: string, branchName: string) => {
+    if (branches.length <= 1) {
+      alert("Cabang utama tidak dapat dihapus jika hanya tersisa 1 cabang.")
+      return
+    }
+    if (!confirm(`Hapus cabang "${branchName}"? Data transaksi dan perangkat cabang ini akan dinonaktifkan.`)) {
+      return
+    }
+    try {
+      const res = await fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
+        method: "DELETE",
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Gagal menghapus cabang")
+      }
+      deleteBranchState(branchId)
+      await refreshBranches()
+    } catch (e: any) {
+      alert("Error: " + e.message)
+    }
   }
 
   // Filter based on active branch selector
@@ -357,78 +390,142 @@ export default function OwnerDashboardInterlockingClient({
         </div>
       )}
 
-      {/* MULTI-BRANCH OVERVIEW CARDS (Image 2 Blueprint: 4 Cabang - Konsolidasi Semua Cabang) */}
-      {isAllBranches && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-extrabold text-slate-900">
-                  Live Feed Seluruh Cabang ({branches.length} Outlet Aktif)
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Performa harian per outlet sesuai arsitektur Image 2
-                </p>
-              </div>
+      {/* KELOLA CABANG OUTLET (Dashboard Owner: Edit nama cabang, lokasi/alamat, hapus, dan tambah cabang baru) */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900">
+                Kelola Cabang Outlet ({branches.length} Outlet Aktif)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Kelola nama cabang, alamat gerai, status perangkat IoT, atau tambah cabang baru
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {branchCardsData.map((bItem, idx) => (
-              <div
-                key={bItem.branch.id}
-                className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 hover:shadow-md transition-all"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <h3 className="text-sm font-extrabold text-slate-900 truncate">
-                        {bItem.branch.name}
-                      </h3>
-                    </div>
-                    <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                      Online
-                    </span>
+          <button
+            type="button"
+            onClick={() => setIsAddBranchOpen(true)}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Cabang Baru</span>
+          </button>
+        </div>
+
+        {/* Info Banner when only 1 branch exists (Fresh registration state) */}
+        {branches.length === 1 && (
+          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-emerald-950">Cabang Pertama Siap Diatur</h4>
+                <p className="text-xs text-emerald-850 mt-0.5">
+                  Anda memiliki 1 cabang awal. Silakan klik tombol <b>Edit Cabang</b> untuk menyesuaikan nama cabang dan alamat gerai fisik Anda agar tercetak rapi di struk kasir.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingBranch(branches[0])}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>Edit Nama & Alamat Cabang</span>
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {branchCardsData.map((bItem, idx) => (
+            <div
+              key={bItem.branch.id}
+              className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 hover:bg-white transition-all"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <h3 className="text-sm font-extrabold text-slate-900 truncate">
+                      {bItem.branch.name}
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
+                    Online
+                  </span>
+                </div>
+
+                <div className="text-xs text-slate-500 flex items-start gap-1 mb-3">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                  <span className="truncate">{bItem.branch.location || "Alamat belum diatur"}</span>
+                </div>
+
+                <div className="space-y-2 mb-4 bg-white p-3 rounded-xl border border-slate-200/60">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Omzet Riil</span>
+                    <p className="text-lg font-black text-slate-900 tabular-nums">
+                      {formatRupiah(bItem.revenue)}
+                    </p>
                   </div>
 
-                  <div className="space-y-2 mb-4">
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">Omzet Riil</span>
-                      <p className="text-xl font-black text-slate-900 tabular-nums">
-                        {formatRupiah(bItem.revenue)}
-                      </p>
+                      <span className="text-slate-400 text-[10px]">Trx Nitrogen</span>
+                      <p className="font-bold text-emerald-700">{bItem.nitrogenCount} ban</p>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100">
-                      <div>
-                        <span className="text-slate-400 text-[10px]">Trx Nitrogen</span>
-                        <p className="font-bold text-emerald-700">{bItem.nitrogenCount} ban</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 text-[10px]">Unit Oli</span>
-                        <p className="font-bold text-blue-700">{bItem.oliCount} botol</p>
-                      </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px]">Unit Oli</span>
+                      <p className="font-bold text-blue-700">{bItem.oliCount} botol</p>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="font-mono text-[10px] text-slate-400">
+              <div className="pt-3 border-t border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="font-mono text-[10px] text-slate-400 flex items-center gap-1">
+                    <Cpu className="w-3 h-3 text-slate-400" />
                     {bItem.branch.deviceId || `ESP32-${idx + 1}`}
                   </span>
                   <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg text-[10px]">
                     Valve Ready
                   </span>
                 </div>
+
+                {/* Branch Action Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingBranch(bItem.branch)}
+                    className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="Edit nama dan lokasi cabang ini"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Edit Cabang</span>
+                  </button>
+
+                  {branches.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBranch(bItem.branch.id, bItem.branch.name)}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                      title="Hapus cabang ini"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -753,6 +850,21 @@ export default function OwnerDashboardInterlockingClient({
           </div>
         </div>
       )}
+
+      {/* MODAL TAMBAH CABANG OUTLET (Dashboard Owner) */}
+      <AddBranchModal
+        isOpen={isAddBranchOpen}
+        onClose={() => setIsAddBranchOpen(false)}
+        onSuccess={() => refreshBranches()}
+      />
+
+      {/* MODAL EDIT NAMA & LOKASI CABANG (Dashboard Owner) */}
+      <EditBranchModal
+        branch={editingBranch}
+        isOpen={!!editingBranch}
+        onClose={() => setEditingBranch(null)}
+        onSuccess={() => refreshBranches()}
+      />
     </div>
   )
 }

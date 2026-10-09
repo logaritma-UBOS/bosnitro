@@ -2,9 +2,8 @@
 
 import { useState } from "react"
 import { useBranch } from "@/context/BranchContext"
-import { ShiftClosing } from "@/types/branch"
+import { ShiftClosing, Branch } from "@/types/branch"
 import { formatRupiah } from "@/lib/format"
-import BranchSelector from "@/components/branch/BranchSelector"
 import {
   Lock,
   ShieldCheck,
@@ -15,16 +14,20 @@ import {
   Send,
   RotateCcw,
   Receipt,
+  MapPin,
 } from "lucide-react"
 
 export default function ShiftClosingClient({
   initialClosings,
+  assignedBranch,
   user,
 }: {
   initialClosings: ShiftClosing[]
+  assignedBranch?: Branch | null
   user?: { id?: string; name?: string | null; role?: string | null }
 }) {
-  const { selectedBranchId } = useBranch()
+  const { selectedBranch } = useBranch()
+  const activeBranch = assignedBranch || selectedBranch
   const isOwnerOrManager = user?.role === "OWNER" || user?.role === "MANAGER"
 
   const [activeTab, setActiveTab] = useState<"INPUT" | "HISTORY">("INPUT")
@@ -72,7 +75,7 @@ export default function ShiftClosingClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          branchId: selectedBranchId,
+          branchId: activeBranch.id,
           physicalCash,
           notes,
         }),
@@ -110,8 +113,18 @@ export default function ShiftClosingClient({
           </p>
         </div>
 
-        <div className="w-full md:w-64">
-          <BranchSelector />
+        {/* Locked Assigned Branch Badge (No multi-branch selector) */}
+        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-emerald-50 border border-emerald-200/80 rounded-2xl shrink-0 self-start md:self-auto">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+            <MapPin className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-wider block">
+              Cabang Anda
+            </span>
+            <span className="text-xs font-bold text-slate-900 block">{activeBranch.name}</span>
+            <p className="text-[10px] text-slate-400 truncate max-w-[180px]">{activeBranch.location}</p>
+          </div>
         </div>
       </div>
 

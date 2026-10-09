@@ -12,7 +12,9 @@ import {
   formatTextReceipt,
   printDirectWebBluetooth,
   getRawBtIntentUrl,
+  subscribeBluetoothState,
 } from "@/lib/bluetoothPrinter"
+import BluetoothPrinterModal from "@/components/bluetooth/BluetoothPrinterModal"
 import {
   User,
   LogOut,
@@ -82,6 +84,17 @@ export default function KasirInterlockingClient({
   const [cameraStatus, setCameraStatus] = useState<"Ready" | "Off">("Ready")
   const [iotStatus, setIotStatus] = useState<"Online" | "Offline">("Online")
   const [printerConnected, setPrinterConnected] = useState(false)
+  const [printerDeviceName, setPrinterDeviceName] = useState<string | null>(null)
+  const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false)
+
+  // Listen to Web Bluetooth connection state live
+  useEffect(() => {
+    const unsub = subscribeBluetoothState((connected, name) => {
+      setPrinterConnected(connected)
+      setPrinterDeviceName(name)
+    })
+    return () => unsub()
+  }, [])
 
   // Solenoid valve execution state
   const [solenoidModalOpen, setSolenoidModalOpen] = useState(false)
@@ -189,13 +202,9 @@ export default function KasirInterlockingClient({
     return cart.find((item) => item.product.category === "NITROGEN")
   }, [cart])
 
-  // Bluetooth connect toggle
-  const handleConnectPrinter = async () => {
-    try {
-      setPrinterConnected(true)
-    } catch {
-      setPrinterConnected(false)
-    }
+  // Bluetooth connect modal opener
+  const handleConnectPrinter = () => {
+    setIsBluetoothModalOpen(true)
   }
 
   // Reprint last receipt
@@ -454,17 +463,23 @@ export default function KasirInterlockingClient({
             <span>IoT: {iotStatus}</span>
           </div>
 
-          {/* Status Printer */}
+          {/* Status Printer Bluetooth */}
           <button
+            type="button"
             onClick={handleConnectPrinter}
-            className={`shrink-0 flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] md:text-xs font-semibold transition-all hover:ring-2 hover:ring-blue-300 ${
+            className={`shrink-0 flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] md:text-xs font-bold transition-all hover:ring-2 hover:ring-blue-300 cursor-pointer ${
               printerConnected
-                ? "bg-blue-100 text-blue-700"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer"
+                ? "bg-emerald-100 text-emerald-850 border border-emerald-300 shadow-xs"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
+            title="Klik untuk membuka menu sambungkan printer Bluetooth"
           >
-            <Bluetooth size={13} />
-            <span>Printer: {printerConnected ? "Connected" : "Connect"}</span>
+            <Bluetooth size={13} className={printerConnected ? "text-emerald-600" : "text-gray-500"} />
+            <span>
+              {printerConnected
+                ? `● ${printerDeviceName || "BT Printer"} Ready`
+                : "🔌 Sambungkan BT"}
+            </span>
           </button>
         </div>
       </header>
@@ -1195,6 +1210,17 @@ export default function KasirInterlockingClient({
                   </button>
                 </div>
 
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsBluetoothModalOpen(true)}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-850 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Bluetooth className="w-3 h-3" />
+                    <span>{printerConnected ? `● ${printerDeviceName || "Printer"} Siap (Pengaturan)` : "🔌 Sambungkan Printer Bluetooth"}</span>
+                  </button>
+                </div>
+
                 {printStatus && (
                   <p className="text-[11px] text-center text-slate-600 font-medium bg-slate-100 py-1 rounded-lg">
                     {printStatus}
@@ -1231,6 +1257,15 @@ export default function KasirInterlockingClient({
           </div>
         </div>
       )}
+
+      {/* Dedicated Bluetooth Thermal Printer Manager Modal */}
+      <BluetoothPrinterModal
+        isOpen={isBluetoothModalOpen}
+        onClose={() => setIsBluetoothModalOpen(false)}
+        storeName={selectedBranch.name || "UBOS NITROGEN"}
+        paperSize={printerSize}
+        onPaperSizeChange={setPrinterSize}
+      />
     </div>
   )
 }

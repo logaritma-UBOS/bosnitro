@@ -21,6 +21,7 @@ import {
   Store,
   Settings,
   ShieldCheck,
+  MapPin,
 } from "lucide-react"
 
 type NavItem = {
@@ -78,7 +79,7 @@ const navGroups: NavGroup[] = [
 
 export default function DesktopSidebar({ businessName, role = "OWNER" }: { businessName?: string; role?: string }) {
   const pathname = usePathname()
-  const { isAllBranches } = useBranch()
+  const { isAllBranches, selectedBranch } = useBranch()
 
   // Sembunyikan sidebar pada layar POS kasir
   if (pathname === "/kasir" || pathname?.startsWith("/kasir")) {
@@ -112,9 +113,25 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
         )}
       </div>
 
-      {/* Global Branch Selector Widget */}
+      {/* Global Branch Selector Widget (Locked for Shift Closing and Kasir) */}
       <div className="px-3 pt-3 pb-1 border-b border-gray-100">
-        <BranchSelector allowAll={role === "OWNER"} />
+        {pathname === "/shift-closing" || role === "KASIR" ? (
+          <div className="flex items-center gap-2.5 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-left">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 flex items-center justify-center shrink-0">
+              <MapPin className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                Cabang Bertugas
+              </span>
+              <span className="text-xs font-bold text-slate-800 truncate block">
+                {selectedBranch?.name || "Cabang Outlet"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <BranchSelector allowAll={role === "OWNER"} />
+        )}
       </div>
 
       {/* Navigation Groups */}

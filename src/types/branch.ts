@@ -7,12 +7,9 @@ export type Branch = {
   createdAt?: string | Date
 }
 
-// 4 Cabang utama sesuai arsitektur backend dashboard owner
+// 1 Cabang awal tunggal saat registrasi baru
 export const DEFAULT_BRANCHES: Branch[] = [
-  { id: "branch-utama", name: "Cabang Tambun", location: "Jl. Sultan Hasanudin, Tambun Selatan", deviceId: "ESP32-TAMBUN", status: "ONLINE" },
-  { id: "branch-cibitung-1", name: "Cabang Cibitung 1", location: "Jl. Teuku Umar No. 12, Cibitung", deviceId: "ESP32-CIBITUNG-1", status: "ONLINE" },
-  { id: "branch-cibitung-2", name: "Cabang Cibitung 2", location: "Kawasan Industri MM2100", deviceId: "ESP32-CIBITUNG-2", status: "ONLINE" },
-  { id: "branch-cibitung-3", name: "Cabang Cibitung 3", location: "Jl. Raya Fatahillah, Cikarang", deviceId: "ESP32-CIBITUNG-3", status: "ONLINE" },
+  { id: "branch-utama", name: "Cabang Utama", location: "Jl. Utama No. 1", deviceId: "ESP32-UTAMA", status: "ONLINE" },
 ]
 
 export type StoreProfileSettings = {

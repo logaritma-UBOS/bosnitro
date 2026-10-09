@@ -2,6 +2,168 @@ import { formatRupiah } from "@/lib/format"
 import { InterlockingTransaction } from "@/types/branch"
 
 /**
+ * Common Bluetooth Low Energy (BLE) Thermal Printer Service & Characteristic UUIDs
+ * Covers 99% of mini portable thermal printers (POS-58, GOOJPRT, Panda, RPP02N, MPT-II, Iware, Eppos, etc.)
+ */
+const PRINTER_SERVICES = [
+  "000018f0-0000-1000-8000-00805f9b34fb", // POS Standard Service
+  "0000ffe0-0000-1000-8000-00805f9b34fb", // HM-10 / CC2541 UART Service
+  "e7810a71-73ae-499d-8c15-faa9aef0c3f2", // Common Mini Printer Service
+  "49535343-fe7d-4ae5-8fa9-9fafd205e455", // ISSC Transparent UART
+  "0000ff00-0000-1000-8000-00805f9b34fb", // Generic Thermal Service
+  "0000fee7-0000-1000-8000-00805f9b34fb", // WeChat / Generic BLE Printer
+  "0000af30-0000-1000-8000-00805f9b34fb", // Alternative POS Service
+  "0000fff0-0000-1000-8000-00805f9b34fb", // Generic POS Service
+  "000018f1-0000-1000-8000-00805f9b34fb", // Alternative POS 2
+]
+
+// In-memory singleton state for active Web Bluetooth connection
+let activeDevice: any = null
+let activeServer: any = null
+let activeWriteCharacteristic: any = null
+let stateListeners: Array<(connected: boolean, deviceName: string | null) => void> = []
+
+export function isBluetoothSupported(): boolean {
+  return typeof window !== "undefined" && typeof (navigator as any).bluetooth !== "undefined"
+}
+
+export function isBluetoothConnected(): boolean {
+  return !!(
+    activeDevice &&
+    activeDevice.gatt &&
+    activeDevice.gatt.connected &&
+    activeWriteCharacteristic
+  )
+}
+
+export function getConnectedDeviceName(): string | null {
+  if (isBluetoothConnected() && activeDevice) {
+    return activeDevice.name || "Printer Bluetooth"
+  }
+  return null
+}
+
+function notifyStateChange(connected: boolean, deviceName: string | null) {
+  stateListeners.forEach((listener) => {
+    try {
+      listener(connected, deviceName)
+    } catch (e) {
+      console.error("Bluetooth state listener error:", e)
+    }
+  })
+}
+
+export function subscribeBluetoothState(
+  listener: (connected: boolean, deviceName: string | null) => void
+): () => void {
+  stateListeners.push(listener)
+  // Immediately emit current state
+  listener(isBluetoothConnected(), getConnectedDeviceName())
+  return () => {
+    stateListeners = stateListeners.filter((l) => l !== listener)
+  }
+}
+
+/**
+ * Connect to a Mini Bluetooth Thermal Printer
+ */
+export async function connectBluetoothPrinter(): Promise<{
+  success: boolean
+  deviceName: string
+  message: string
+}> {
+  if (!isBluetoothSupported()) {
+    throw new Error(
+      "Web Bluetooth API tidak didukung pada browser ini. Pastikan menggunakan Chrome pada Android atau PC (dan aktifkan Bluetooth & Lokasi/GPS)."
+    )
+  }
+
+  const nav = navigator as any
+
+  try {
+    const device = await nav.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: PRINTER_SERVICES,
+    })
+
+    if (!device) {
+      throw new Error("Tidak ada perangkat yang dipilih.")
+    }
+
+    // Handle sudden disconnect (printer switched off / out of range)
+    device.addEventListener("gattserverdisconnected", () => {
+      console.log("[Web Bluetooth] Device disconnected:", device.name)
+      activeDevice = null
+      activeServer = null
+      activeWriteCharacteristic = null
+      notifyStateChange(false, null)
+    })
+
+    const server = await device.gatt.connect()
+    const services = await server.getPrimaryServices()
+
+    let foundCharacteristic: any = null
+
+    for (const service of services) {
+      try {
+        const characteristics = await service.getCharacteristics()
+        for (const char of characteristics) {
+          if (char.properties.write || char.properties.writeWithoutResponse) {
+            foundCharacteristic = char
+            break
+          }
+        }
+        if (foundCharacteristic) break
+      } catch (err) {
+        // continue search
+      }
+    }
+
+    if (!foundCharacteristic) {
+      device.gatt.disconnect()
+      throw new Error(
+        "Karakteristik write Bluetooth thermal printer tidak ditemukan pada perangkat ini. Pastikan perangkat yang dipilih adalah printer thermal."
+      )
+    }
+
+    activeDevice = device
+    activeServer = server
+    activeWriteCharacteristic = foundCharacteristic
+
+    const deviceName = device.name || "Mini Thermal Printer"
+    notifyStateChange(true, deviceName)
+
+    return {
+      success: true,
+      deviceName,
+      message: `Printer ${deviceName} berhasil tersambung!`,
+    }
+  } catch (err: any) {
+    if (err.name === "NotFoundError") {
+      return { success: false, deviceName: "", message: "Pemilihan printer Bluetooth dibatalkan." }
+    }
+    throw err
+  }
+}
+
+/**
+ * Disconnect active Bluetooth printer
+ */
+export function disconnectBluetoothPrinter(): void {
+  if (activeDevice && activeDevice.gatt) {
+    try {
+      activeDevice.gatt.disconnect()
+    } catch (e) {
+      console.error("Error disconnecting Bluetooth printer:", e)
+    }
+  }
+  activeDevice = null
+  activeServer = null
+  activeWriteCharacteristic = null
+  notifyStateChange(false, null)
+}
+
+/**
  * Helper formatting plain text receipt for 58mm (32 characters per line) and 80mm (48 chars)
  */
 export function formatTextReceipt(
@@ -31,7 +193,7 @@ export function formatTextReceipt(
   lines.push(center("OUTLET POS TERINTEGRASI"))
   lines.push(doubleSeparator)
   lines.push(row("No. Struk:", tx.id))
-  lines.push(row("Cabang:", tx.branchName || "Tambun"))
+  lines.push(row("Cabang:", tx.branchName || "Cabang Outlet"))
   lines.push(row("Kasir:", tx.cashierName || "Kasir"))
   lines.push(
     row(
@@ -67,7 +229,7 @@ export function formatTextReceipt(
   lines.push(center(footerText || "Terima Kasih Atas Kunjungan Anda!"))
   lines.push(center("Simpan struk ini sebagai bukti audit."))
   lines.push(doubleSeparator)
-  lines.push("\n\n")
+  lines.push("\n\n\n")
 
   return lines.join("\n")
 }
@@ -93,63 +255,88 @@ export function textToEscPos(text: string): Uint8Array {
 }
 
 /**
- * Opsi A: Direct Web Bluetooth API printing
+ * Send receipt bytes directly to Bluetooth printer
  */
-export async function printDirectWebBluetooth(receiptText: string): Promise<{ success: boolean; message: string }> {
-  if (typeof window === "undefined" || !(navigator as any).bluetooth) {
-    throw new Error("Web Bluetooth API tidak didukung pada browser ini. Gunakan Chrome di Android/PC atau Opsi RawBT.")
+export async function printDirectWebBluetooth(
+  receiptText: string
+): Promise<{ success: boolean; message: string }> {
+  // If not connected yet, try connecting first
+  if (!isBluetoothConnected()) {
+    const conn = await connectBluetoothPrinter()
+    if (!conn.success) {
+      return { success: false, message: conn.message }
+    }
+  }
+
+  if (!activeWriteCharacteristic) {
+    throw new Error("Printer belum terhubung atau koneksi terputus. Silakan sambungkan ulang.")
   }
 
   try {
-    const nav = navigator as any
-    const device = await nav.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        "000018f0-0000-1000-8000-00805f9b34fb",
-        "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
-        "0000ffe0-0000-1000-8000-00805f9b34fb",
-        "49535343-fe7d-4ae5-8fa9-9fafd205e455",
-      ],
-    })
-
-    const server = await device.gatt.connect()
-    const services = await server.getPrimaryServices()
-
-    let writeChar = null
-    for (const service of services) {
-      const chars = await service.getCharacteristics()
-      for (const char of chars) {
-        if (char.properties.write || char.properties.writeWithoutResponse) {
-          writeChar = char
-          break
-        }
-      }
-      if (writeChar) break
-    }
-
-    if (!writeChar) {
-      throw new Error("Karakteristik write Bluetooth thermal printer tidak ditemukan.")
-    }
-
     const data = textToEscPos(receiptText)
     // Chunking to avoid Bluetooth MTU buffer overflow (max 100 bytes per chunk)
     const chunkSize = 100
     for (let i = 0; i < data.length; i += chunkSize) {
       const chunk = data.slice(i, i + chunkSize)
-      await writeChar.writeValue(chunk)
+      if (activeWriteCharacteristic.writeValueWithoutResponse) {
+        await activeWriteCharacteristic.writeValueWithoutResponse(chunk)
+      } else {
+        await activeWriteCharacteristic.writeValue(chunk)
+      }
+      // Small delay between packets to prevent printer buffer overrun
+      await new Promise((resolve) => setTimeout(resolve, 25))
     }
 
-    return { success: true, message: "Struk berhasil dicetak via Web Bluetooth!" }
-  } catch (err: any) {
-    if (err.name === "NotFoundError") {
-      return { success: false, message: "Pemilihan printer Bluetooth dibatalkan." }
+    const deviceName = getConnectedDeviceName() || "Printer Bluetooth"
+    return {
+      success: true,
+      message: `Struk berhasil dicetak ke ${deviceName}!`,
     }
-    throw err
+  } catch (err: any) {
+    console.error("Print write error:", err)
+    // If GATT connection failed, reset state
+    if (err.message && (err.message.includes("GATT") || err.message.includes("disconnected"))) {
+      disconnectBluetoothPrinter()
+    }
+    throw new Error("Gagal mengirim data cetak ke printer Bluetooth: " + (err.message || ""))
   }
 }
 
 /**
- * Opsi B: Android RawBT Intent URL Scheme
+ * Test Print Function to verify connection immediately
+ */
+export async function testPrintBluetooth(
+  storeName: string = "UBOS NITROGEN",
+  paperSize: "58mm" | "80mm" = "58mm"
+): Promise<{ success: boolean; message: string }> {
+  const dummyTx: InterlockingTransaction = {
+    id: `TEST-${Date.now().toString().slice(-4)}`,
+    branchId: "branch-utama",
+    branchName: "CABANG UTAMA",
+    cashierName: "Uji Coba Sistem",
+    totalAmount: 15000,
+    paymentMethod: "CASH",
+    createdAt: new Date().toISOString(),
+    status: "COMPLETED",
+    items: [
+      {
+        productId: "nitro-motor-tambal",
+        productName: "Uji Cetak Printer Bluetooth",
+        category: "NITROGEN",
+        quantity: 1,
+        price: 15000,
+        costPrice: 0,
+        subtotal: 15000,
+      },
+    ],
+  }
+
+  const receipt = formatTextReceipt(dummyTx, storeName, paperSize, "KONEKSI PRINTER BLUETOOTH OK")
+  return await printDirectWebBluetooth(receipt)
+}
+
+/**
+ * Opsi B: Android RawBT Intent URL Scheme fallback
  */
 export function getRawBtIntentUrl(receiptText: string): string {
   if (typeof window === "undefined") return ""

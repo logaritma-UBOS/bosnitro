@@ -85,6 +85,25 @@ export async function createBranch(data: { name: string; location: string; devic
   return newBranch
 }
 
+export async function updateBranch(id: string, data: { name?: string; location?: string; deviceId?: string }): Promise<Branch | null> {
+  const branch = runtimeBranches.find(b => b.id === id)
+  if (!branch) return null
+
+  if (data.name !== undefined && data.name.trim()) branch.name = data.name.trim()
+  if (data.location !== undefined) branch.location = data.location.trim()
+  if (data.deviceId !== undefined) branch.deviceId = data.deviceId.trim()
+
+  try {
+    await supabase.from("branches").update({
+      name: branch.name,
+      location: branch.location,
+      device_id: branch.deviceId,
+    }).eq("id", id)
+  } catch (e) {}
+
+  return branch
+}
+
 export async function deleteBranch(id: string): Promise<boolean> {
   // Prevent deleting if only 1 branch left
   if (runtimeBranches.length <= 1) return false
@@ -680,71 +699,48 @@ export type BranchStaff = {
 }
 
 let runtimeStaffs: BranchStaff[] = [
-  // Cabang Tambun
+  // Cabang Utama
   {
-    id: "staff-tambun-1",
+    id: "staff-utama-1",
     branchId: "branch-utama",
-    branchName: "Cabang Tambun",
+    branchName: "Cabang Utama",
     name: "Budi Santoso",
-    email: "budi.tambun@ubos.id",
+    email: "kasir@ubos.id",
     role: "KASIR",
     phone: "081234567891",
     createdAt: new Date().toISOString(),
   },
-  {
-    id: "staff-tambun-2",
-    branchId: "branch-utama",
-    branchName: "Cabang Tambun",
-    name: "Joko Widodo",
-    email: "joko.tambun@ubos.id",
-    role: "MANAGER",
-    phone: "081234567892",
-    createdAt: new Date().toISOString(),
-  },
-  // Cabang Cibitung 1
-  {
-    id: "staff-cibitung1-1",
-    branchId: "branch-cibitung-1",
-    branchName: "Cabang Cibitung 1",
-    name: "Rian Hidayat",
-    email: "rian.cibitung1@ubos.id",
-    role: "KASIR",
-    phone: "085712345678",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "staff-cibitung1-2",
-    branchId: "branch-cibitung-1",
-    branchName: "Cabang Cibitung 1",
-    name: "Agus Setiawan",
-    email: "agus.cibitung1@ubos.id",
-    role: "MANAGER",
-    phone: "085712345679",
-    createdAt: new Date().toISOString(),
-  },
-  // Cabang Cibitung 2
-  {
-    id: "staff-cibitung2-1",
-    branchId: "branch-cibitung-2",
-    branchName: "Cabang Cibitung 2",
-    name: "Doni Pratama",
-    email: "doni.cibitung2@ubos.id",
-    role: "KASIR",
-    phone: "087890123456",
-    createdAt: new Date().toISOString(),
-  },
-  // Cabang Cibitung 3
-  {
-    id: "staff-cibitung3-1",
-    branchId: "branch-cibitung-3",
-    branchName: "Cabang Cibitung 3",
-    name: "Andi Saputra",
-    email: "andi.cibitung3@ubos.id",
-    role: "KASIR",
-    phone: "081398765432",
-    createdAt: new Date().toISOString(),
-  },
 ]
+
+export async function getUserAssignedBranch(userId?: string, userEmail?: string): Promise<Branch | null> {
+  const branches = await getBranches()
+  
+  // 1. Check if user is staff in Prisma
+  try {
+    if (userId) {
+      const dbUser = await (await import("@/lib/prisma")).prisma.user.findUnique({
+        where: { id: userId },
+        select: { phone: true, role: true }
+      })
+      if (dbUser && dbUser.phone) {
+        const found = branches.find(b => b.id === dbUser.phone)
+        if (found) return found
+      }
+    }
+  } catch (e) {}
+
+  // 2. Check in runtimeStaffs
+  if (userEmail) {
+    const staff = runtimeStaffs.find(s => s.email.toLowerCase() === userEmail.toLowerCase())
+    if (staff) {
+      const found = branches.find(b => b.id === staff.branchId)
+      if (found) return found
+    }
+  }
+
+  // Fallback to first branch
+  return branches[0] || null
+}
 
 export async function getStaffListByBranch(branchId?: string): Promise<BranchStaff[]> {
   if (!branchId || branchId === "ALL") {

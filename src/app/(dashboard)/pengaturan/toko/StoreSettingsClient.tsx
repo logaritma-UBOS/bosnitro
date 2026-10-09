@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { useBranch } from "@/context/BranchContext"
 import { StoreProfileSettings, HardwareSettings } from "@/types/branch"
-import AddBranchModal from "@/components/branch/AddBranchModal"
+import BluetoothPrinterModal from "@/components/bluetooth/BluetoothPrinterModal"
 import { formatRupiah } from "@/lib/format"
 import {
   formatTextReceipt,
@@ -30,6 +30,7 @@ import {
   Radio,
   Video,
   Printer,
+  Bluetooth,
   Trophy,
   Zap,
   Play,
@@ -43,7 +44,8 @@ export default function StoreSettingsClient({
   initialSettings: StoreProfileSettings
 }) {
   const { branches, refreshBranches, selectedBranchId, selectedBranch, isAllBranches } = useBranch()
-  const [activeTab, setActiveTab] = useState<"PROFIL" | "CABANG" | "HARDWARE" | "TARGET_REWARD">("PROFIL")
+  const [activeTab, setActiveTab] = useState<"PROFIL" | "HARDWARE" | "TARGET_REWARD">("PROFIL")
+  const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false)
 
   // Auto-switch away from HARDWARE if on Semua Cabang mode
   useEffect(() => {
@@ -387,7 +389,7 @@ export default function StoreSettingsClient({
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
-            Kelola profil outlet, cabang gerai, integrasi ESP32 & CCTV, printer Bluetooth, dan target reward 30 hari
+            Kelola profil outlet, integrasi ESP32 & CCTV, printer Bluetooth, dan target reward 30 hari
           </p>
         </div>
       </div>
@@ -417,17 +419,6 @@ export default function StoreSettingsClient({
         >
           <Store className="w-4 h-4 text-emerald-600" />
           <span>Profil Toko & Telegram</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("CABANG")}
-          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === "CABANG" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <Building2 className="w-4 h-4 text-blue-600" />
-          <span>Multi-Cabang ({branches.length})</span>
         </button>
 
         {!isAllBranches && (
@@ -547,70 +538,7 @@ export default function StoreSettingsClient({
         </form>
       )}
 
-      {/* TAB 2: MULTI-CABANG OUTLET */}
-      {activeTab === "CABANG" && (
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                Kelola Cabang Outlet ({branches.length} Cabang Aktif)
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Sesuai Image 2: Cabang Tambun, Cabang Cibitung 1, Cabang Cibitung 2, Cabang Cibitung 3
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsAddBranchOpen(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Tambah Cabang Baru</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {branches.map((b, idx) => (
-              <div key={b.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-                      {b.name}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Online
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500 flex items-start gap-1 mb-2">
-                    <MapPin className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" />
-                    <span>{b.location}</span>
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                    <Cpu className="w-3 h-3 text-slate-400 shrink-0" />
-                    <span>{b.deviceId || `ESP32-${b.id}`}</span>
-                  </div>
-                </div>
-
-                <div className="pt-3 mt-3 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">{idx === 0 ? "Cabang Utama" : `Cabang #${idx + 1}`}</span>
-                  {branches.length > 1 && idx !== 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteBranch(b.id, b.name)}
-                      className="text-red-500 hover:text-red-700 p-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: INTEGRASI HARDWARE & IOT (Terisolasi per Cabang - Requirement #2 & #3) */}
+      {/* TAB 2: INTEGRASI HARDWARE & IOT (Terisolasi per Cabang - Requirement #2 & #3) */}
       {activeTab === "HARDWARE" && (
         <form onSubmit={handleSaveHardwareSettings} className="space-y-6">
           {/* Active Branch Hardware Notice */}
@@ -870,12 +798,20 @@ export default function StoreSettingsClient({
                 />
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBluetoothModalOpen(true)}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Bluetooth className="w-3.5 h-3.5" />
+                  <span>Buka Dialog Sambungkan Bluetooth</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleTestPrinter}
                   disabled={testingPrinter}
-                  className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+                  className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>{testingPrinter ? "Mencetak..." : "Uji Cetak Struk Bluetooth"}</span>
@@ -1100,10 +1036,12 @@ export default function StoreSettingsClient({
         </form>
       )}
 
-      <AddBranchModal
-        isOpen={isAddBranchOpen}
-        onClose={() => setIsAddBranchOpen(false)}
-        onSuccess={() => refreshBranches()}
+      <BluetoothPrinterModal
+        isOpen={isBluetoothModalOpen}
+        onClose={() => setIsBluetoothModalOpen(false)}
+        storeName={storeName || "UBOS NITROGEN"}
+        paperSize={hwSettings.paperSize || "58mm"}
+        onPaperSizeChange={(sz) => setHwSettings({ ...hwSettings, paperSize: sz })}
       />
     </div>
   )

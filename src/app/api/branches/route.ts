@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getBranches, createBranch, deleteBranch } from "@/lib/interlockingDb"
+import { getBranches, createBranch, updateBranch, deleteBranch } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
 export async function GET() {
@@ -8,6 +8,40 @@ export async function GET() {
     return NextResponse.json(branches)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== "OWNER") {
+      return NextResponse.json({ error: "Hanya Owner yang dapat mengubah data cabang" }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const { id, name, location, deviceId } = body
+
+    if (!id) {
+      return NextResponse.json({ error: "ID Cabang wajib disertakan" }, { status: 400 })
+    }
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: "Nama cabang wajib diisi" }, { status: 400 })
+    }
+
+    const updated = await updateBranch(id, {
+      name: name.trim(),
+      location: (location || "").trim(),
+      deviceId: deviceId?.trim(),
+    })
+
+    if (!updated) {
+      return NextResponse.json({ error: "Cabang tidak ditemukan" }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, branch: updated })
+  } catch (error: any) {
+    console.error("Error updating branch:", error)
+    return NextResponse.json({ error: error.message || "Gagal memperbarui cabang" }, { status: 500 })
   }
 }
 
