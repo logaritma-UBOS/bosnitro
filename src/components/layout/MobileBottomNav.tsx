@@ -259,7 +259,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
 
               {/* INTEGRASI TAMBAHAN (OWNER ONLY) */}
               {role === "OWNER" && !isAllBranches && (
-                <div>
+              /*  <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-2">
                     INTEGRASI & SISTEM
                   </p>
@@ -275,7 +275,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */
 
             <div className="p-4 border-t border-gray-100 bg-white">
               <form action={logoutUser}>
