@@ -727,7 +727,7 @@ export async function getFraudAlerts(branchId?: string): Promise<FraudAlert[]> {
 export async function recordFraudAlert(payload: {
   branchId: string
   deviceId: string
-  alertType: "UNAUTHORIZED_FLOW" | "TAMPER_DETECTED" | "DISCREPANCY"
+  alertType: FraudAlert["alertType"]
   message: string
 }): Promise<FraudAlert> {
   const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
@@ -744,14 +744,25 @@ export async function recordFraudAlert(payload: {
 
   runtimeFraudAlerts.unshift(alert)
 
-  // Send Telegram Notification
-  const tgMsg = `🚨 <b>PERINGATAN SENSOR IOT - KECURANGAN / ANOMALI</b>\n\n` +
+  // Send Telegram Notification customized by alert type
+  let headerTitle = "🚨 <b>PERINGATAN SENSOR IOT - KECURANGAN / ANOMALI</b>"
+  let footerNote = "<i>Mohon segera periksa CCTV atau galeri audit POS cabang terkait!</i>"
+
+  if (payload.alertType === "SENSOR_OFFLINE" || payload.alertType === "DEVICE_OFFLINE") {
+    headerTitle = "🚨 <b>PERINGATAN PERANGKAT IOT - SENSOR / MODUL MATI (OFFLINE)</b>"
+    footerNote = "<i>Periksa koneksi daya atau jaringan WiFi modul ESP32 di outlet terkait!</i>"
+  } else if (payload.alertType === "DISCREPANCY") {
+    headerTitle = "⚠️ <b>PERINGATAN AUDIT KASIR - SELISIH SETORAN UANG</b>"
+    footerNote = "<i>Pemeriksaan selisih setoran fisik kasir otomatis oleh BOSNITRO Audit System.</i>"
+  }
+
+  const tgMsg = `${headerTitle}\n\n` +
     `📍 <b>Cabang:</b> ${branch.name} (${branch.location})\n` +
     `📟 <b>Device ID:</b> ${payload.deviceId}\n` +
     `⚠️ <b>Tipe:</b> ${payload.alertType}\n` +
     `📝 <b>Detail:</b> ${payload.message}\n` +
     `⏰ <b>Waktu:</b> ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
-    `<i>Mohon segera periksa CCTV atau galeri audit POS cabang terkait!</i>`
+    `${footerNote}`
 
   await sendTelegramAlert(tgMsg)
 

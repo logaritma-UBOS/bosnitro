@@ -63,7 +63,7 @@ const navGroups: NavGroup[] = [
       // Pengeluaran hanya di masing-masing cabang, disembunyikan di Semua Cabang
       { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BRANCH_ONLY" },
       { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users, scope: "BRANCH_ONLY" },
-      { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BRANCH_ONLY" },
+      { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BOTH" },
     ],
   },
   {
@@ -102,11 +102,11 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
             <p className="text-xs font-bold text-gray-700 truncate">{businessName}</p>
           )}
         </div>
-        {role === "OWNER" && !isAllBranches && (
+        {role === "OWNER" && (
           <Link
             href="/pengaturan/toko"
             className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
-            title="Pengaturan Toko & IoT"
+            title={isAllBranches ? "Pengaturan Pusat Bisnis (Owner)" : "Pengaturan Hardware & IoT Cabang"}
           >
             <Settings className="w-4 h-4" />
           </Link>
@@ -167,7 +167,11 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
               <div className="space-y-0.5">
                 {visibleItems.map((item) => {
                   const active = isActive(item.href)
-                  const IconComponent = item.icon
+                  const isSettingsItem = item.href === "/pengaturan/toko"
+                  const displayLabel = isSettingsItem
+                    ? (isAllBranches ? "Pengaturan Bisnis (Owner)" : "Pengaturan Hardware & IoT")
+                    : item.label
+                  const IconComponent = isSettingsItem && isAllBranches ? Settings : item.icon
 
                   return (
                     <Link
@@ -184,7 +188,7 @@ export default function DesktopSidebar({ businessName, role = "OWNER" }: { busin
                           active ? "text-emerald-600" : "text-gray-400"
                         }`}
                       />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">{displayLabel}</span>
                     </Link>
                   )
                 })}

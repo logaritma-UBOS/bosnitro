@@ -249,19 +249,21 @@ export default function OwnerDashboardInterlockingClient({
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSendTelegramReport}
-            disabled={sendingTelegram}
-            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-          >
-            <Send className="w-4 h-4" />
-            <span>
-              {sendingTelegram
-                ? "Mengirim Laporan..."
-                : `Kirim Laporan Telegram (${telegramChatId ? `Grup ${telegramChatId}` : telegramPhone})`}
-            </span>
-          </button>
+          {isAllBranches && (
+            <button
+              type="button"
+              onClick={handleSendTelegramReport}
+              disabled={sendingTelegram}
+              className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs rounded-xl shadow-md shadow-sky-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              <span>
+                {sendingTelegram
+                  ? "Mengirim Laporan..."
+                  : `Kirim Laporan Telegram (${telegramChatId ? `Grup ${telegramChatId}` : telegramPhone})`}
+              </span>
+            </button>
+          )}
           <div className="w-full sm:w-64">
             <BranchSelector allowAll={true} />
           </div>

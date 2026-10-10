@@ -56,7 +56,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
     { label: "Pelanggan CRM", href: "/crm", icon: Users, scope: "BOTH" },
     { label: "Pengeluaran", href: "/pengeluaran", icon: DollarSign, scope: "BRANCH_ONLY" },
     { label: "Pegawai", href: "/pengaturan/pegawai", icon: Users, scope: "BRANCH_ONLY" },
-    { label: "Pengaturan & IoT", href: "/pengaturan/toko", icon: Store, scope: "BRANCH_ONLY" },
+    { label: isAllBranches ? "Pengaturan Bisnis (Owner)" : "Pengaturan Hardware & IoT", href: "/pengaturan/toko", icon: Store, scope: "BOTH" },
   ]
 
   const baseBisnisLinks = [
@@ -257,25 +257,7 @@ export default function MobileBottomNav({ role = "OWNER" }: { role?: string }) {
                 </div>
               ))}
 
-              {/* INTEGRASI TAMBAHAN (OWNER ONLY) */}
-              {role === "OWNER" && !isAllBranches && (
-              /*  <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-2">
-                    INTEGRASI & SISTEM
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link
-                      href="/pengaturan/whatsapp"
-                      onClick={() => setIsMoreOpen(false)}
-                      className="flex items-center gap-2.5 p-3 rounded-2xl bg-white border border-gray-100 hover:border-emerald-300 text-gray-700 text-xs font-semibold shadow-xs"
-                    >
-                      <MessageSquare className="w-4 h-4 text-emerald-600" />
-                      <span>WhatsApp Blast</span>
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div> */
+            </div>
 
             <div className="p-4 border-t border-gray-100 bg-white">
               <form action={logoutUser}>

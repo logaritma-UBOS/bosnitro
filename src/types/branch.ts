@@ -85,7 +85,7 @@ export type FraudAlert = {
   branchId: string
   branchName: string
   deviceId: string
-  alertType: "UNAUTHORIZED_FLOW" | "TAMPER_DETECTED" | "DISCREPANCY" | "COMPRESSOR_OFF_HOURS"
+  alertType: "UNAUTHORIZED_FLOW" | "TAMPER_DETECTED" | "DISCREPANCY" | "COMPRESSOR_OFF_HOURS" | "SENSOR_OFFLINE" | "DEVICE_OFFLINE"
   message: string
   detectedAt: string | Date
 }

@@ -45,13 +45,21 @@ export default function StoreSettingsClient({
   initialSettings: StoreProfileSettings
 }) {
   const { branches, refreshBranches, selectedBranchId, selectedBranch, isAllBranches } = useBranch()
-  const [activeTab, setActiveTab] = useState<"PROFIL" | "HARDWARE" | "TARGET_REWARD">("PROFIL")
+  const [activeTab, setActiveTab] = useState<"PROFIL" | "HARDWARE" | "TARGET_REWARD">(
+    isAllBranches ? "PROFIL" : "HARDWARE"
+  )
   const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false)
 
-  // Auto-switch away from HARDWARE if on Semua Cabang mode
+  // Strictly enforce tab isolation: Owner mode has PROFIL & TARGET_REWARD, Branch mode has only HARDWARE
   useEffect(() => {
-    if (isAllBranches && activeTab === "HARDWARE") {
-      setActiveTab("PROFIL")
+    if (isAllBranches) {
+      if (activeTab === "HARDWARE") {
+        setActiveTab("PROFIL")
+      }
+    } else {
+      if (activeTab !== "HARDWARE") {
+        setActiveTab("HARDWARE")
+      }
     }
   }, [isAllBranches, activeTab])
 
@@ -415,15 +423,19 @@ export default function StoreSettingsClient({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Store className="w-5 h-5" />
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+              isAllBranches ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
+            }`}>
+              {isAllBranches ? <Building2 className="w-5 h-5" /> : <Cpu className="w-5 h-5" />}
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-              Pengaturan Toko & Hardware IoT
+              {isAllBranches ? "Pengaturan Pusat Bisnis & Target (Owner)" : `Pengaturan Hardware & IoT - ${selectedBranch?.name || "Cabang Outlet"}`}
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-500">
-            Kelola profil outlet, integrasi ESP32 & CCTV, printer Bluetooth, dan target reward 30 hari
+            {isAllBranches
+              ? "Kelola identitas brand, nomor & bot Telegram laporan, serta target 30 hari & bonus reward yang disinkronisasi ke seluruh cabang."
+              : `Kelola integrasi modul ESP32, kamera CCTV plat/botol, dan printer Bluetooth thermal untuk ${selectedBranch?.name || "cabang ini"} (${selectedBranch?.location || ""}).`}
           </p>
         </div>
       </div>
@@ -444,24 +456,35 @@ export default function StoreSettingsClient({
 
       {/* Navigation Tabs */}
       <div className="flex bg-slate-200/80 p-1.5 rounded-2xl gap-1 overflow-x-auto">
-        <button
-          type="button"
-          onClick={() => setActiveTab("PROFIL")}
-          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === "PROFIL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <Store className="w-4 h-4 text-emerald-600" />
-          <span>Profil Toko & Telegram</span>
-        </button>
+        {isAllBranches ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTab("PROFIL")}
+              className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+                activeTab === "PROFIL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Store className="w-4 h-4 text-emerald-600" />
+              <span>Profil Toko & Telegram</span>
+            </button>
 
-        {!isAllBranches && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("TARGET_REWARD")}
+              className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
+                activeTab === "TARGET_REWARD" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Trophy className="w-4 h-4 text-yellow-600" />
+              <span>Target 30 Hari & Reward</span>
+            </button>
+          </>
+        ) : (
           <button
             type="button"
             onClick={() => setActiveTab("HARDWARE")}
-            className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
-              activeTab === "HARDWARE" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-            }`}
+            className="py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-white text-slate-900 shadow-xs transition-all"
           >
             <Cpu className="w-4 h-4 text-amber-600" />
             <span>Integrasi Hardware & IoT</span>
@@ -470,21 +493,10 @@ export default function StoreSettingsClient({
             </span>
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("TARGET_REWARD")}
-          className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition-all ${
-            activeTab === "TARGET_REWARD" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <Trophy className="w-4 h-4 text-yellow-600" />
-          <span>Target 30 Hari & Reward</span>
-        </button>
       </div>
 
-      {/* TAB 1: PROFIL TOKO & TELEGRAM */}
-      {activeTab === "PROFIL" && (
+      {/* TAB 1: PROFIL TOKO & TELEGRAM (HANYA MUNCUL DI LEVEL OWNER / SEMUA CABANG) */}
+      {isAllBranches && activeTab === "PROFIL" && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs flex flex-col items-center justify-center text-center space-y-4">
@@ -644,8 +656,8 @@ export default function StoreSettingsClient({
         </form>
       )}
 
-      {/* TAB 2: INTEGRASI HARDWARE & IOT (Terisolasi per Cabang - Requirement #2 & #3) */}
-      {activeTab === "HARDWARE" && (
+      {/* TAB 2: INTEGRASI HARDWARE & IOT (Terisolasi Khusus per Cabang) */}
+      {!isAllBranches && activeTab === "HARDWARE" && (
         <form onSubmit={handleSaveHardwareSettings} className="space-y-6">
           {/* Active Branch Hardware Notice */}
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
@@ -1050,8 +1062,8 @@ export default function StoreSettingsClient({
         </form>
       )}
 
-      {/* TAB 4: TARGET 30 HARI & SISTEM REWARD (Requirement #4) */}
-      {activeTab === "TARGET_REWARD" && (
+      {/* TAB 3: TARGET 30 HARI & SISTEM REWARD (Hanya Diatur oleh Owner & Sinkron ke Seluruh Cabang) */}
+      {isAllBranches && activeTab === "TARGET_REWARD" && (
         <form onSubmit={handleSaveHardwareSettings} className="space-y-6">
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-6">
             <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
