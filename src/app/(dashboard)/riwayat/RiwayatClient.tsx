@@ -8,6 +8,12 @@ import { formatRupiah } from "@/lib/format"
 import { InterlockingTransaction } from "@/types/branch"
 import { getPendingTransactions } from "@/lib/adapters/offlineQueueAdapter"
 import {
+  getLocalTransactions,
+  syncTransactions,
+  subscribeTransactions,
+  saveLocalTransactions,
+} from "@/lib/transactionStore"
+import {
   History,
   TrendingUp,
   Receipt,
@@ -31,18 +37,22 @@ export default function RiwayatClient() {
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
 
   const fetchTransactions = async () => {
-    setLoading(true)
+    const branchParam = isAllBranches ? "ALL" : selectedBranchId
+
+    // 1. Instant local render (Zero loading delay)
+    const localCached = getLocalTransactions(branchParam)
+    if (localCached.length > 0) {
+      setTransactions(localCached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+
     try {
-      const branchParam = isAllBranches ? "ALL" : selectedBranchId
-      const res = await fetch(`/api/pos/transactions?branchId=${branchParam}`)
-      const data = await res.json()
+      // 2. Perform two-way sync with server
+      const syncedList = await syncTransactions(branchParam)
 
-      let txList: InterlockingTransaction[] = []
-      if (data.transactions && Array.isArray(data.transactions)) {
-        txList = data.transactions
-      }
-
-      // Merge pending offline transactions if any
+      // 3. Merge pending offline transactions if any
       const queue = getPendingTransactions()
       const pendingTxList: InterlockingTransaction[] = queue
         .filter((q: any) => isAllBranches || !q.branchId || q.branchId === selectedBranchId)
@@ -73,11 +83,22 @@ export default function RiwayatClient() {
           })),
         }))
 
-      const merged = [...pendingTxList, ...txList].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+      const map = new Map<string, InterlockingTransaction>()
+      for (const t of syncedList) {
+        if (t && t.id) map.set(t.id, t)
+      }
+      for (const t of pendingTxList) {
+        if (t && t.id && !map.has(t.id)) map.set(t.id, t)
+      }
+
+      const merged = Array.from(map.values())
+        .filter((t) => isAllBranches || t.branchId === selectedBranchId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
       setTransactions(merged)
+      if (merged.length > 0) {
+        saveLocalTransactions(merged)
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -87,20 +108,37 @@ export default function RiwayatClient() {
 
   useEffect(() => {
     fetchTransactions()
+
+    // Real-time listener for transactions created across windows/tabs/POS
+    const unsubscribe = subscribeTransactions(() => {
+      fetchTransactions()
+    })
+    return () => unsubscribe()
   }, [selectedBranchId, isAllBranches])
 
-  // Filter based on date
+  // Filter based on date & strict branch isolation
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
+      // Strict branch isolation
+      if (!isAllBranches && tx.branchId !== selectedBranchId) {
+        return false
+      }
+
       const txDate = new Date(tx.createdAt)
       const now = new Date()
 
       if (dateFilter === "today") {
-        return (
-          txDate.getDate() === now.getDate() &&
-          txDate.getMonth() === now.getMonth() &&
-          txDate.getFullYear() === now.getFullYear()
-        )
+        const toYMD = (d: string | Date) => {
+          const dt = new Date(d)
+          if (isNaN(dt.getTime())) return ""
+          return new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Asia/Jakarta",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(dt)
+        }
+        return toYMD(tx.createdAt) === toYMD(now)
       } else if (dateFilter === "7d") {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         return txDate >= sevenDaysAgo
@@ -110,7 +148,7 @@ export default function RiwayatClient() {
       }
       return true
     })
-  }, [transactions, dateFilter])
+  }, [transactions, dateFilter, selectedBranchId, isAllBranches])
 
   // KPI calculations
   const totalOmzet = useMemo(() => {

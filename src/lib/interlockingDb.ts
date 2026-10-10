@@ -153,6 +153,20 @@ export async function updateStoreSettings(
 
 export async function getBranches(): Promise<Branch[]> {
   try {
+    const { prisma } = await import("@/lib/prisma")
+    const setting = await prisma.systemSetting.findUnique({
+      where: { key: "bosnitro_branches_list" }
+    })
+    if (setting?.value) {
+      const parsed = JSON.parse(setting.value)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        runtimeBranches = parsed
+        return parsed
+      }
+    }
+  } catch (e) {}
+
+  try {
     const { data, error } = await supabase.from("branches").select("*")
     if (!error && data && data.length > 0) {
       return data.map((d: any) => ({
@@ -184,9 +198,18 @@ export async function createBranch(data: { name: string; location: string; devic
     createdAt: new Date().toISOString(),
   }
 
+  await getBranches()
   runtimeBranches.push(newBranch)
 
-  // Auto-seed standard products for this new branch in runtime if needed
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: "bosnitro_branches_list" },
+      update: { value: JSON.stringify(runtimeBranches) },
+      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+    })
+  } catch (e) {}
+
   try {
     await supabase.from("branches").insert({
       id: newBranch.id,
@@ -201,12 +224,22 @@ export async function createBranch(data: { name: string; location: string; devic
 }
 
 export async function updateBranch(id: string, data: { name?: string; location?: string; deviceId?: string }): Promise<Branch | null> {
+  await getBranches()
   const branch = runtimeBranches.find(b => b.id === id)
   if (!branch) return null
 
   if (data.name !== undefined && data.name.trim()) branch.name = data.name.trim()
   if (data.location !== undefined) branch.location = data.location.trim()
   if (data.deviceId !== undefined) branch.deviceId = data.deviceId.trim()
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: "bosnitro_branches_list" },
+      update: { value: JSON.stringify(runtimeBranches) },
+      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+    })
+  } catch (e) {}
 
   try {
     await supabase.from("branches").update({
@@ -220,10 +253,20 @@ export async function updateBranch(id: string, data: { name?: string; location?:
 }
 
 export async function deleteBranch(id: string): Promise<boolean> {
-  // Prevent deleting if only 1 branch left
+  await getBranches()
   if (runtimeBranches.length <= 1) return false
 
   runtimeBranches = runtimeBranches.filter(b => b.id !== id)
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: "bosnitro_branches_list" },
+      update: { value: JSON.stringify(runtimeBranches) },
+      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+    })
+  } catch (e) {}
+
   try {
     await supabase.from("branches").delete().eq("id", id)
   } catch (e) {}
@@ -678,6 +721,18 @@ export async function recordTransaction(payload: {
 
   runtimeTransactions.unshift(tx)
 
+  // Persist transaction directly to durable DB
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: `tx_${tx.id}` },
+      update: { value: JSON.stringify(tx) },
+      create: { id: `sys-tx-${tx.id}`, key: `tx_${tx.id}`, value: JSON.stringify(tx) }
+    })
+  } catch (e) {
+    console.error("Error persisting tx:", e)
+  }
+
   // Auto-sync customer to CRM
   if (payload.customerPlate) {
     const serviceSummary = transactionItems.map(i => i.productName).join(", ")
@@ -710,18 +765,91 @@ export async function recordTransaction(payload: {
   return tx
 }
 
-export async function getTransactions(branchId?: string): Promise<InterlockingTransaction[]> {
-  if (!branchId || branchId === "ALL") {
-    return runtimeTransactions
+export async function saveTransactionsBatch(txs: InterlockingTransaction[]): Promise<InterlockingTransaction[]> {
+  if (!Array.isArray(txs) || txs.length === 0) return []
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    for (const tx of txs) {
+      if (!tx || !tx.id) continue
+      if (!runtimeTransactions.some(t => t.id === tx.id)) {
+        runtimeTransactions.unshift(tx)
+      }
+      await prisma.systemSetting.upsert({
+        where: { key: `tx_${tx.id}` },
+        update: { value: JSON.stringify(tx) },
+        create: { id: `sys-tx-${tx.id}`, key: `tx_${tx.id}`, value: JSON.stringify(tx) }
+      })
+    }
+  } catch (e) {
+    console.error("Error batch saving transactions:", e)
   }
-  return runtimeTransactions.filter(t => t.branchId === branchId)
+  return txs
+}
+
+export async function getTransactions(branchId?: string): Promise<InterlockingTransaction[]> {
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const list = await prisma.systemSetting.findMany({
+      where: { key: { startsWith: "tx_" } }
+    })
+    const map = new Map<string, InterlockingTransaction>()
+    for (const item of list) {
+      try {
+        const parsed = JSON.parse(item.value)
+        if (parsed && parsed.id) map.set(parsed.id, parsed)
+      } catch (e) {}
+    }
+    for (const t of runtimeTransactions) {
+      if (!map.has(t.id)) map.set(t.id, t)
+    }
+    const all = Array.from(map.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    runtimeTransactions = all
+
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(t => t.branchId === branchId)
+  } catch (e) {
+    if (!branchId || branchId === "ALL") {
+      return runtimeTransactions
+    }
+    return runtimeTransactions.filter(t => t.branchId === branchId)
+  }
 }
 
 export async function getFraudAlerts(branchId?: string): Promise<FraudAlert[]> {
-  if (!branchId || branchId === "ALL") {
-    return runtimeFraudAlerts
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const list = await prisma.systemSetting.findMany({
+      where: { key: { startsWith: "alert_" } }
+    })
+    const map = new Map<string, FraudAlert>()
+    for (const item of list) {
+      try {
+        const parsed = JSON.parse(item.value)
+        if (parsed && parsed.id) map.set(parsed.id, parsed)
+      } catch (e) {}
+    }
+    for (const a of runtimeFraudAlerts) {
+      if (!map.has(a.id)) map.set(a.id, a)
+    }
+    const all = Array.from(map.values()).sort(
+      (a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()
+    )
+    runtimeFraudAlerts = all
+
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(a => a.branchId === branchId)
+  } catch (e) {
+    if (!branchId || branchId === "ALL") {
+      return runtimeFraudAlerts
+    }
+    return runtimeFraudAlerts.filter(a => a.branchId === branchId)
   }
-  return runtimeFraudAlerts.filter(a => a.branchId === branchId)
 }
 
 export async function recordFraudAlert(payload: {
@@ -743,6 +871,15 @@ export async function recordFraudAlert(payload: {
   }
 
   runtimeFraudAlerts.unshift(alert)
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: `alert_${alert.id}` },
+      update: { value: JSON.stringify(alert) },
+      create: { id: `sys-alert-${alert.id}`, key: `alert_${alert.id}`, value: JSON.stringify(alert) }
+    })
+  } catch (e) {}
 
   // Send Telegram Notification customized by alert type
   let headerTitle = "🚨 <b>PERINGATAN SENSOR IOT - KECURANGAN / ANOMALI</b>"
@@ -778,7 +915,7 @@ export async function recordShiftClosing(payload: {
 }): Promise<ShiftClosing> {
   const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
-  const branchTxs = runtimeTransactions.filter(t => 
+  const branchTxs = (await getTransactions(payload.branchId)).filter(t => 
     t.branchId === payload.branchId &&
     t.paymentMethod === "CASH" &&
     t.status === "COMPLETED"
@@ -800,14 +937,50 @@ export async function recordShiftClosing(payload: {
   }
 
   runtimeShiftClosings.unshift(closing)
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: `shift_${closing.id}` },
+      update: { value: JSON.stringify(closing) },
+      create: { id: `sys-shift-${closing.id}`, key: `shift_${closing.id}`, value: JSON.stringify(closing) }
+    })
+  } catch (e) {}
+
   return closing
 }
 
 export async function getShiftClosings(branchId?: string): Promise<ShiftClosing[]> {
-  if (!branchId || branchId === "ALL") {
-    return runtimeShiftClosings
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const list = await prisma.systemSetting.findMany({
+      where: { key: { startsWith: "shift_" } }
+    })
+    const map = new Map<string, ShiftClosing>()
+    for (const item of list) {
+      try {
+        const parsed = JSON.parse(item.value)
+        if (parsed && parsed.id) map.set(parsed.id, parsed)
+      } catch (e) {}
+    }
+    for (const c of runtimeShiftClosings) {
+      if (!map.has(c.id)) map.set(c.id, c)
+    }
+    const all = Array.from(map.values()).sort(
+      (a, b) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime()
+    )
+    runtimeShiftClosings = all
+
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(s => s.branchId === branchId)
+  } catch (e) {
+    if (!branchId || branchId === "ALL") {
+      return runtimeShiftClosings
+    }
+    return runtimeShiftClosings.filter(s => s.branchId === branchId)
   }
-  return runtimeShiftClosings.filter(s => s.branchId === branchId)
 }
 
 // -------------------------------------------------------------

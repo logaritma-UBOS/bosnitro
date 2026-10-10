@@ -15,6 +15,7 @@ import {
   subscribeBluetoothState,
 } from "@/lib/bluetoothPrinter"
 import BluetoothPrinterModal from "@/components/bluetooth/BluetoothPrinterModal"
+import { saveLocalTransactions } from "@/lib/transactionStore"
 import {
   User,
   LogOut,
@@ -298,6 +299,7 @@ export default function KasirInterlockingClient({
       const tx: InterlockingTransaction = data.transaction
       setCompletedTx(tx)
       setLastCart([...cart])
+      saveLocalTransactions([tx])
 
       // Trigger IoT Solenoid Valve if Nitrogen was in cart
       if (hasNitrogenInCart && nitrogenItem) {

@@ -8,6 +8,7 @@ import BranchSelector from "@/components/branch/BranchSelector"
 import AddBranchModal from "@/components/branch/AddBranchModal"
 import EditBranchModal from "@/components/branch/EditBranchModal"
 import Link from "next/link"
+import { getLocalTransactions, syncTransactions, subscribeTransactions } from "@/lib/transactionStore"
 import {
   BarChart3,
   TrendingUp,
@@ -50,7 +51,24 @@ export default function OwnerDashboardInterlockingClient({
   initialTelegramPhone?: string
 }) {
   const { branches, selectedBranch, selectedBranchId, isAllBranches, deleteBranchState, refreshBranches } = useBranch()
-  const [transactions] = useState<InterlockingTransaction[]>(initialTransactions)
+  const [transactions, setTransactions] = useState<InterlockingTransaction[]>(() => {
+    if (typeof window !== "undefined") {
+      const local = getLocalTransactions()
+      if (local.length > 0) {
+        const map = new Map<string, InterlockingTransaction>()
+        for (const t of initialTransactions) {
+          if (t && t.id) map.set(t.id, t)
+        }
+        for (const t of local) {
+          if (t && t.id) map.set(t.id, t)
+        }
+        return Array.from(map.values()).sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      }
+    }
+    return initialTransactions
+  })
   const [alerts] = useState<FraudAlert[]>(initialAlerts)
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string } | null>(null)
 
@@ -68,7 +86,17 @@ export default function OwnerDashboardInterlockingClient({
   const [telegramBotToken, setTelegramBotToken] = useState<string | null>(null)
   const [telegramSentAutomatic, setTelegramSentAutomatic] = useState(false)
 
+  const refreshDashboardTransactions = async () => {
+    const branchParam = isAllBranches ? "ALL" : selectedBranchId
+    const synced = await syncTransactions(branchParam)
+    if (synced && synced.length > 0) {
+      setTransactions(synced)
+    }
+  }
+
   useEffect(() => {
+    refreshDashboardTransactions()
+
     fetch("/api/settings/store")
       .then((res) => res.json())
       .then((data) => {
@@ -95,6 +123,19 @@ export default function OwnerDashboardInterlockingClient({
         setLoadingAnalytics(false)
       })
       .catch(() => setLoadingAnalytics(false))
+
+    // Real-time listener for POS transaction completions
+    const unsubscribe = subscribeTransactions(() => {
+      refreshDashboardTransactions()
+      fetch(`/api/analytics/30-days?branchId=${isAllBranches ? "ALL" : selectedBranchId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.data) setAnalytics30Days(data.data)
+        })
+        .catch(() => {})
+    })
+
+    return () => unsubscribe()
   }, [selectedBranchId, isAllBranches])
 
   // Telegram report state

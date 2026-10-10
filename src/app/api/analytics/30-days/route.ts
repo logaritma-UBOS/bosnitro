@@ -13,10 +13,22 @@ export async function GET(req: Request) {
     const rewardBonusPool = settings.rewardBonusPool || 2000000
     const rewardCriteria = settings.rewardCriteria || "DAILY_AVG_TARGET"
 
-    // Retrieve all transactions
-    const allTrx: InterlockingTransaction[] = await getTransactions()
+    // Retrieve all transactions (scoped by branch if specified)
+    const allTrx: InterlockingTransaction[] = await getTransactions(branchId && branchId !== "ALL" ? branchId : undefined)
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    // Helper for Indonesian timezone YYYY-MM-DD
+    const toJakartaYMD = (d: Date | string) => {
+      const dt = new Date(d)
+      if (isNaN(dt.getTime())) return ""
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(dt)
+    }
 
     // Filter for the last 30 days and optional branch
     const filteredTrx = allTrx.filter((t: InterlockingTransaction) => {
@@ -32,7 +44,7 @@ export async function GET(req: Request) {
     // Pre-populate all 30 days
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-      const dateKey = d.toISOString().split("T")[0]
+      const dateKey = toJakartaYMD(d)
       dailyMap[dateKey] = {
         totalOmzet: 0,
         count: 0,
@@ -42,7 +54,7 @@ export async function GET(req: Request) {
     }
 
     filteredTrx.forEach((t: InterlockingTransaction) => {
-      const dateKey = new Date(t.createdAt).toISOString().split("T")[0]
+      const dateKey = toJakartaYMD(t.createdAt)
       if (dailyMap[dateKey]) {
         dailyMap[dateKey].totalOmzet += t.totalAmount
         dailyMap[dateKey].count += 1
