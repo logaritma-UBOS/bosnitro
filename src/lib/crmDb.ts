@@ -59,8 +59,11 @@ let runtimeCustomers: CustomerCRM[] = [
   },
 ]
 
-export async function getCustomers(filter?: { branchId?: string; search?: string }): Promise<CustomerCRM[]> {
+export async function getCustomers(filter?: { branchId?: string; search?: string; businessId?: string }): Promise<CustomerCRM[]> {
   let list = [...runtimeCustomers]
+  if (filter?.businessId) {
+    list = list.filter((c) => !c.businessId || c.businessId === filter.businessId)
+  }
   if (filter?.branchId && filter.branchId !== "ALL") {
     list = list.filter((c) => c.branchId === filter.branchId)
   }
@@ -77,6 +80,7 @@ export async function getCustomers(filter?: { branchId?: string; search?: string
 }
 
 export async function upsertCustomer(data: {
+  businessId?: string
   name: string
   phone: string
   plateNumber?: string

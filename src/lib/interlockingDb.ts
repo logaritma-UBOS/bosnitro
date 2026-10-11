@@ -16,10 +16,10 @@ const scopedRuntimeStoreSettings: Record<string, {
 }> = {}
 
 const DEFAULT_STORE_SETTINGS = {
-  storeName: "MERUVIN",
+  storeName: "BOSNITRO",
   profileImage: null as string | null,
-  telegramPhone: "083153598697",
-  telegramChatId: "-5332437584" as string | null,
+  telegramPhone: "",
+  telegramChatId: null as string | null,
   telegramBotToken: null as string | null,
 }
 
@@ -59,23 +59,49 @@ export async function getStoreSettings(scopeId?: string): Promise<{
     const map = Object.fromEntries(settings.map(s => [s.key, s.value]))
 
     const item = scopedRuntimeStoreSettings[keyPrefix]
-    if (scopeId && map[`${scopeId}_store_name`]) item.storeName = map[`${scopeId}_store_name`]
-    else if (!scopeId && map["store_name"]) item.storeName = map["store_name"]
+    if (scopeId) {
+      if (map[`${scopeId}_store_name`]) {
+        item.storeName = map[`${scopeId}_store_name`]
+      } else {
+        // Fallback to registered Business name for this user in Prisma
+        try {
+          const biz = await prisma.business.findFirst({
+            where: { OR: [{ id: scopeId }, { userId: scopeId }] },
+            select: { name: true }
+          })
+          if (biz?.name) item.storeName = biz.name
+        } catch (err) {}
+      }
 
-    if (scopeId && map[`${scopeId}_store_telegram_phone`]) item.telegramPhone = map[`${scopeId}_store_telegram_phone`]
-    else if (!scopeId && map["store_telegram_phone"]) item.telegramPhone = map["store_telegram_phone"]
-
-    const foundChatId = (scopeId && map[`${scopeId}_store_telegram_chat_id`]) || map["store_telegram_chat_id"] || DEFAULT_STORE_SETTINGS.telegramChatId || process.env.TELEGRAM_CHAT_ID
-    if (foundChatId) item.telegramChatId = foundChatId
-
-    const foundToken = (scopeId && map[`${scopeId}_store_telegram_bot_token`]) || map["store_telegram_bot_token"] || DEFAULT_STORE_SETTINGS.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN
-    if (foundToken) item.telegramBotToken = foundToken
-
-    if (scopeId && map[`${scopeId}_store_profile_image`]) item.profileImage = map[`${scopeId}_store_profile_image`]
-    else if (!scopeId && map["store_profile_image"]) item.profileImage = map["store_profile_image"]
+      item.telegramPhone = map[`${scopeId}_store_telegram_phone`] || ""
+      item.telegramChatId = map[`${scopeId}_store_telegram_chat_id`] || null
+      item.telegramBotToken = map[`${scopeId}_store_telegram_bot_token`] || null
+      item.profileImage = map[`${scopeId}_store_profile_image`] || null
+    } else {
+      if (map["store_name"]) item.storeName = map["store_name"]
+      if (map["store_telegram_phone"]) item.telegramPhone = map["store_telegram_phone"]
+      item.telegramChatId = map["store_telegram_chat_id"] || null
+      item.telegramBotToken = map["store_telegram_bot_token"] || null
+      if (map["store_profile_image"]) item.profileImage = map["store_profile_image"]
+    }
   } catch (e) {}
 
   return scopedRuntimeStoreSettings[keyPrefix]
+}
+
+export async function getTenantBusinessId(session: any): Promise<string | undefined> {
+  if (!session?.user?.id) return undefined
+  if (session.user.businessId) return session.user.businessId
+  if (session.user.staffBusinessId) return session.user.staffBusinessId
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const biz = await prisma.business.findFirst({
+      where: { userId: session.user.id },
+      select: { id: true }
+    })
+    if (biz?.id) return biz.id
+  } catch (e) {}
+  return session.user.id
 }
 
 export async function updateStoreSettings(
@@ -99,14 +125,14 @@ export async function updateStoreSettings(
   if (data.telegramPhone !== undefined && data.telegramPhone.trim()) item.telegramPhone = data.telegramPhone.trim()
   if (data.telegramChatId !== undefined && data.telegramChatId && data.telegramChatId.trim()) {
     item.telegramChatId = data.telegramChatId.trim()
-    DEFAULT_STORE_SETTINGS.telegramChatId = data.telegramChatId.trim()
+    if (!scopeId) DEFAULT_STORE_SETTINGS.telegramChatId = data.telegramChatId.trim()
   }
   if (data.telegramBotToken !== undefined && data.telegramBotToken && data.telegramBotToken.trim()) {
     item.telegramBotToken = data.telegramBotToken.trim()
-    DEFAULT_STORE_SETTINGS.telegramBotToken = data.telegramBotToken.trim()
+    if (!scopeId) DEFAULT_STORE_SETTINGS.telegramBotToken = data.telegramBotToken.trim()
   }
 
-  // Persist directly to Prisma SystemSetting (scoped per account/business and global fallback)
+  // Persist directly to Prisma SystemSetting (scoped per account/business)
   try {
     const { prisma } = await import("@/lib/prisma")
     const storeNameKey = scopeId ? `${scopeId}_store_name` : "store_name"
@@ -121,11 +147,13 @@ export async function updateStoreSettings(
         update: { value: data.storeName.trim() },
         create: { id: `sys-${storeNameKey}`, key: storeNameKey, value: data.storeName.trim() }
       })
-      await prisma.systemSetting.upsert({
-        where: { key: "store_name" },
-        update: { value: data.storeName.trim() },
-        create: { id: "sys-store_name", key: "store_name", value: data.storeName.trim() }
-      }).catch(() => {})
+      if (!scopeId) {
+        await prisma.systemSetting.upsert({
+          where: { key: "store_name" },
+          update: { value: data.storeName.trim() },
+          create: { id: "sys-store_name", key: "store_name", value: data.storeName.trim() }
+        }).catch(() => {})
+      }
     }
     if (data.telegramPhone && data.telegramPhone.trim()) {
       await prisma.systemSetting.upsert({
@@ -133,11 +161,13 @@ export async function updateStoreSettings(
         update: { value: data.telegramPhone.trim() },
         create: { id: `sys-${phoneKey}`, key: phoneKey, value: data.telegramPhone.trim() }
       })
-      await prisma.systemSetting.upsert({
-        where: { key: "store_telegram_phone" },
-        update: { value: data.telegramPhone.trim() },
-        create: { id: "sys-store_telegram_phone", key: "store_telegram_phone", value: data.telegramPhone.trim() }
-      }).catch(() => {})
+      if (!scopeId) {
+        await prisma.systemSetting.upsert({
+          where: { key: "store_telegram_phone" },
+          update: { value: data.telegramPhone.trim() },
+          create: { id: "sys-store_telegram_phone", key: "store_telegram_phone", value: data.telegramPhone.trim() }
+        }).catch(() => {})
+      }
     }
     if (data.telegramChatId !== undefined && data.telegramChatId && data.telegramChatId.trim()) {
       const val = data.telegramChatId.trim()
@@ -146,11 +176,13 @@ export async function updateStoreSettings(
         update: { value: val },
         create: { id: `sys-${chatIdKey}`, key: chatIdKey, value: val }
       })
-      await prisma.systemSetting.upsert({
-        where: { key: "store_telegram_chat_id" },
-        update: { value: val },
-        create: { id: "sys-store_telegram_chat_id", key: "store_telegram_chat_id", value: val }
-      }).catch(() => {})
+      if (!scopeId) {
+        await prisma.systemSetting.upsert({
+          where: { key: "store_telegram_chat_id" },
+          update: { value: val },
+          create: { id: "sys-store_telegram_chat_id", key: "store_telegram_chat_id", value: val }
+        }).catch(() => {})
+      }
     }
     if (data.telegramBotToken !== undefined && data.telegramBotToken && data.telegramBotToken.trim()) {
       const val = data.telegramBotToken.trim()
@@ -159,11 +191,13 @@ export async function updateStoreSettings(
         update: { value: val },
         create: { id: `sys-${botTokenKey}`, key: botTokenKey, value: val }
       })
-      await prisma.systemSetting.upsert({
-        where: { key: "store_telegram_bot_token" },
-        update: { value: val },
-        create: { id: "sys-store_telegram_bot_token", key: "store_telegram_bot_token", value: val }
-      }).catch(() => {})
+      if (!scopeId) {
+        await prisma.systemSetting.upsert({
+          where: { key: "store_telegram_bot_token" },
+          update: { value: val },
+          create: { id: "sys-store_telegram_bot_token", key: "store_telegram_bot_token", value: val }
+        }).catch(() => {})
+      }
     }
     if (data.profileImage !== undefined && data.profileImage) {
       await prisma.systemSetting.upsert({
@@ -177,90 +211,100 @@ export async function updateStoreSettings(
   return item
 }
 
-export async function getBranches(): Promise<Branch[]> {
+export async function getBranches(businessId?: string): Promise<Branch[]> {
+  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
   try {
     const { prisma } = await import("@/lib/prisma")
     const setting = await prisma.systemSetting.findUnique({
-      where: { key: "bosnitro_branches_list" }
+      where: { key: branchKey }
     })
     if (setting?.value) {
       const parsed = JSON.parse(setting.value)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        runtimeBranches = parsed
         return parsed
       }
     }
-  } catch (e) {}
 
-  try {
-    const { data, error } = await supabase.from("branches").select("*")
-    if (!error && data && data.length > 0) {
-      return data.map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        location: d.location || "",
-        deviceId: d.device_id || `ESP32-${d.name.toUpperCase().replace(/\s+/g, "-")}`,
-        status: (d.status || "ONLINE") as "ONLINE" | "OFFLINE",
-        createdAt: d.created_at,
-      }))
+    // Auto-generate initial branch for this business if none exists
+    if (businessId) {
+      const defaultInitial: Branch[] = [
+        {
+          id: `${businessId}-utama`,
+          businessId,
+          name: "Cabang Utama",
+          location: "Jl. Utama No. 1",
+          deviceId: "ESP32-UTAMA",
+          status: "ONLINE",
+          createdAt: new Date().toISOString(),
+        }
+      ]
+      await prisma.systemSetting.upsert({
+        where: { key: branchKey },
+        update: { value: JSON.stringify(defaultInitial) },
+        create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(defaultInitial) }
+      }).catch(() => {})
+      return defaultInitial
     }
   } catch (e) {}
 
   return runtimeBranches
 }
 
-export async function saveBranchesBatch(branches: Branch[]): Promise<Branch[]> {
-  if (!Array.isArray(branches) || branches.length === 0) return await getBranches()
+export async function saveBranchesBatch(branches: Branch[], businessId?: string): Promise<Branch[]> {
+  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  if (!Array.isArray(branches) || branches.length === 0) return await getBranches(businessId)
+
+  const existingBranches = await getBranches(businessId)
   const map = new Map<string, Branch>()
-  for (const b of DEFAULT_BRANCHES) map.set(b.id, b)
-  for (const b of runtimeBranches) if (b && b.id) map.set(b.id, b)
-  for (const b of branches) if (b && b.id) map.set(b.id, b)
+  for (const b of existingBranches) if (b && b.id) map.set(b.id, b)
+  for (const b of branches) if (b && b.id) map.set(b.id, { ...b, businessId: businessId || b.businessId })
 
   const merged = Array.from(map.values())
-  runtimeBranches = merged
 
   try {
     const { prisma } = await import("@/lib/prisma")
     await prisma.systemSetting.upsert({
-      where: { key: "bosnitro_branches_list" },
-      update: { value: JSON.stringify(runtimeBranches) },
-      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+      where: { key: branchKey },
+      update: { value: JSON.stringify(merged) },
+      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(merged) }
     })
   } catch (e) {}
 
-  return runtimeBranches
+  return merged
 }
 
-export async function createBranch(data: { id?: string; name: string; location: string; deviceId?: string }): Promise<Branch> {
+export async function createBranch(data: { id?: string; name: string; location: string; deviceId?: string; businessId?: string }): Promise<Branch> {
   const cleanName = data.name.trim()
   const cleanLocation = data.location.trim()
   const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-")
   const branchId = data.id || `branch-${slug}-${Date.now().toString().slice(-4)}`
+  const branchKey = data.businessId ? `${data.businessId}_branches_list` : "bosnitro_branches_list"
 
-  await getBranches()
-  const existingIdx = runtimeBranches.findIndex(b => b.id === branchId || b.name.toLowerCase() === cleanName.toLowerCase())
+  const branches = await getBranches(data.businessId)
+  const existingIdx = branches.findIndex(b => b.id === branchId || b.name.toLowerCase() === cleanName.toLowerCase())
 
   const newBranch: Branch = {
-    id: existingIdx >= 0 ? runtimeBranches[existingIdx].id : branchId,
+    id: existingIdx >= 0 ? branches[existingIdx].id : branchId,
+    businessId: data.businessId,
     name: cleanName,
     location: cleanLocation,
-    deviceId: data.deviceId?.trim() || (existingIdx >= 0 && runtimeBranches[existingIdx].deviceId ? runtimeBranches[existingIdx].deviceId : `ESP32-${slug.toUpperCase()}`),
+    deviceId: data.deviceId?.trim() || (existingIdx >= 0 && branches[existingIdx].deviceId ? branches[existingIdx].deviceId : `ESP32-${slug.toUpperCase()}`),
     status: "ONLINE",
-    createdAt: existingIdx >= 0 && runtimeBranches[existingIdx].createdAt ? runtimeBranches[existingIdx].createdAt : new Date().toISOString(),
+    createdAt: existingIdx >= 0 && branches[existingIdx].createdAt ? branches[existingIdx].createdAt : new Date().toISOString(),
   }
 
   if (existingIdx >= 0) {
-    runtimeBranches[existingIdx] = newBranch
+    branches[existingIdx] = newBranch
   } else {
-    runtimeBranches.push(newBranch)
+    branches.push(newBranch)
   }
 
   try {
     const { prisma } = await import("@/lib/prisma")
     await prisma.systemSetting.upsert({
-      where: { key: "bosnitro_branches_list" },
-      update: { value: JSON.stringify(runtimeBranches) },
-      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+      where: { key: branchKey },
+      update: { value: JSON.stringify(branches) },
+      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(branches) }
     })
   } catch (e) {}
 
@@ -277,21 +321,29 @@ export async function createBranch(data: { id?: string; name: string; location: 
   return newBranch
 }
 
-export async function updateBranch(id: string, data: { name?: string; location?: string; deviceId?: string }): Promise<Branch | null> {
-  await getBranches()
-  const branch = runtimeBranches.find(b => b.id === id)
-  if (!branch) return null
+export async function updateBranch(
+  id: string,
+  data: { name?: string; location?: string; deviceId?: string },
+  businessId?: string
+): Promise<Branch | null> {
+  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  const branches = await getBranches(businessId)
+  const branchIndex = branches.findIndex(b => b.id === id)
+  if (branchIndex === -1) return null
 
+  const branch = { ...branches[branchIndex] }
   if (data.name !== undefined && data.name.trim()) branch.name = data.name.trim()
   if (data.location !== undefined) branch.location = data.location.trim()
   if (data.deviceId !== undefined) branch.deviceId = data.deviceId.trim()
 
+  branches[branchIndex] = branch
+
   try {
     const { prisma } = await import("@/lib/prisma")
     await prisma.systemSetting.upsert({
-      where: { key: "bosnitro_branches_list" },
-      update: { value: JSON.stringify(runtimeBranches) },
-      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+      where: { key: branchKey },
+      update: { value: JSON.stringify(branches) },
+      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(branches) }
     })
   } catch (e) {}
 
@@ -306,18 +358,19 @@ export async function updateBranch(id: string, data: { name?: string; location?:
   return branch
 }
 
-export async function deleteBranch(id: string): Promise<boolean> {
-  await getBranches()
-  if (runtimeBranches.length <= 1) return false
+export async function deleteBranch(id: string, businessId?: string): Promise<boolean> {
+  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  const branches = await getBranches(businessId)
+  if (branches.length <= 1) return false
 
-  runtimeBranches = runtimeBranches.filter(b => b.id !== id)
+  const nextBranches = branches.filter(b => b.id !== id)
 
   try {
     const { prisma } = await import("@/lib/prisma")
     await prisma.systemSetting.upsert({
-      where: { key: "bosnitro_branches_list" },
-      update: { value: JSON.stringify(runtimeBranches) },
-      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+      where: { key: branchKey },
+      update: { value: JSON.stringify(nextBranches) },
+      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(nextBranches) }
     })
   } catch (e) {}
 
@@ -570,6 +623,7 @@ export function getBranchProductsList(branchId?: string): InterlockingProduct[] 
 
 export type BranchExpense = {
   id: string
+  businessId?: string
   branchId: string
   branchName: string
   category: string
@@ -580,7 +634,7 @@ export type BranchExpense = {
 
 let runtimeExpenses: BranchExpense[] = []
 
-export async function getExpenses(branchId?: string): Promise<BranchExpense[]> {
+export async function getExpenses(branchId?: string, businessId?: string): Promise<BranchExpense[]> {
   try {
     const { prisma } = await import("@/lib/prisma")
     const list = await prisma.systemSetting.findMany({
@@ -590,38 +644,49 @@ export async function getExpenses(branchId?: string): Promise<BranchExpense[]> {
     for (const item of list) {
       try {
         const parsed = JSON.parse(item.value)
-        if (parsed && parsed.id) map.set(parsed.id, parsed)
+        if (parsed && parsed.id) {
+          if (businessId && parsed.businessId && parsed.businessId !== businessId) continue
+          map.set(parsed.id, parsed)
+        }
       } catch (e) {}
     }
     for (const e of runtimeExpenses) {
+      if (businessId && e.businessId && e.businessId !== businessId) continue
       if (!map.has(e.id)) map.set(e.id, e)
     }
-    const all = Array.from(map.values()).sort(
+    let all = Array.from(map.values()).sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     )
-    runtimeExpenses = all
+    if (businessId) {
+      all = all.filter(e => !e.businessId || e.businessId === businessId)
+    }
 
     if (!branchId || branchId === "ALL") {
       return all
     }
     return all.filter((e) => e.branchId === branchId)
   } catch (e) {
+    let all = runtimeExpenses
+    if (businessId) all = all.filter(e => !e.businessId || e.businessId === businessId)
     if (!branchId || branchId === "ALL") {
-      return runtimeExpenses
+      return all
     }
-    return runtimeExpenses.filter((e) => e.branchId === branchId)
+    return all.filter((e) => e.branchId === branchId)
   }
 }
 
 export async function recordExpense(payload: {
+  businessId?: string
   branchId: string
   category: string
   amount: number
   description?: string
 }): Promise<BranchExpense> {
-  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  const allBranches = await getBranches(payload.businessId)
+  const branch = allBranches.find(b => b.id === payload.branchId) || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
   const expense: BranchExpense = {
     id: `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    businessId: payload.businessId,
     branchId: payload.branchId,
     branchName: branch.name,
     category: payload.category,
@@ -750,6 +815,7 @@ export async function saveRetailProduct(data: {
 }
 
 export async function recordTransaction(payload: {
+  businessId?: string
   branchId: string
   cashierId?: string | null
   cashierName?: string | null
@@ -768,7 +834,8 @@ export async function recordTransaction(payload: {
   customerName?: string | null
   customerPhone?: string | null
 }): Promise<InterlockingTransaction> {
-  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  const allBranches = await getBranches(payload.businessId)
+  const branch = allBranches.find(b => b.id === payload.branchId) || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
   // Deduct retail / service stock from that branch's inventory
   const branchProds = getBranchProductsList(payload.branchId)
@@ -797,6 +864,7 @@ export async function recordTransaction(payload: {
 
   const tx: InterlockingTransaction = {
     id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    businessId: payload.businessId,
     branchId: payload.branchId,
     branchName: branch.name,
     cashierId: payload.cashierId || null,
@@ -861,12 +929,13 @@ export async function recordTransaction(payload: {
   return tx
 }
 
-export async function saveTransactionsBatch(txs: InterlockingTransaction[]): Promise<InterlockingTransaction[]> {
+export async function saveTransactionsBatch(txs: InterlockingTransaction[], businessId?: string): Promise<InterlockingTransaction[]> {
   if (!Array.isArray(txs) || txs.length === 0) return []
   try {
     const { prisma } = await import("@/lib/prisma")
     for (const tx of txs) {
       if (!tx || !tx.id) continue
+      if (businessId && !tx.businessId) tx.businessId = businessId
       if (!runtimeTransactions.some(t => t.id === tx.id)) {
         runtimeTransactions.unshift(tx)
       }
@@ -882,7 +951,7 @@ export async function saveTransactionsBatch(txs: InterlockingTransaction[]): Pro
   return txs
 }
 
-export async function getTransactions(branchId?: string): Promise<InterlockingTransaction[]> {
+export async function getTransactions(branchId?: string, businessId?: string): Promise<InterlockingTransaction[]> {
   try {
     const { prisma } = await import("@/lib/prisma")
     const list = await prisma.systemSetting.findMany({
@@ -892,30 +961,51 @@ export async function getTransactions(branchId?: string): Promise<InterlockingTr
     for (const item of list) {
       try {
         const parsed = JSON.parse(item.value)
-        if (parsed && parsed.id) map.set(parsed.id, parsed)
+        if (parsed && parsed.id) {
+          // Strict businessId isolation
+          if (businessId && parsed.businessId && parsed.businessId !== businessId) {
+            continue
+          }
+          if (businessId && !parsed.businessId) {
+            // Legacy transaction without businessId: only show if businessId is MERUVIN's id
+            if (businessId !== "8a4c7a28-884c-4da4-8f6c-452d81fb207f" && businessId !== "cf410147-5ede-481d-bb45-8f49a6fdb852") {
+              continue
+            }
+          }
+          map.set(parsed.id, parsed)
+        }
       } catch (e) {}
     }
     for (const t of runtimeTransactions) {
+      if (businessId && t.businessId && t.businessId !== businessId) continue
+      if (businessId && !t.businessId && businessId !== "8a4c7a28-884c-4da4-8f6c-452d81fb207f" && businessId !== "cf410147-5ede-481d-bb45-8f49a6fdb852") continue
       if (!map.has(t.id)) map.set(t.id, t)
     }
-    const all = Array.from(map.values()).sort(
+    let all = Array.from(map.values()).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
-    runtimeTransactions = all
+
+    if (businessId) {
+      all = all.filter(t => t.businessId === businessId || (!t.businessId && (businessId === "8a4c7a28-884c-4da4-8f6c-452d81fb207f" || businessId === "cf410147-5ede-481d-bb45-8f49a6fdb852")))
+    }
 
     if (!branchId || branchId === "ALL") {
       return all
     }
     return all.filter(t => t.branchId === branchId)
   } catch (e) {
-    if (!branchId || branchId === "ALL") {
-      return runtimeTransactions
+    let all = runtimeTransactions
+    if (businessId) {
+      all = all.filter(t => t.businessId === businessId)
     }
-    return runtimeTransactions.filter(t => t.branchId === branchId)
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(t => t.branchId === branchId)
   }
 }
 
-export async function getFraudAlerts(branchId?: string): Promise<FraudAlert[]> {
+export async function getFraudAlerts(branchId?: string, businessId?: string): Promise<FraudAlert[]> {
   try {
     const { prisma } = await import("@/lib/prisma")
     const list = await prisma.systemSetting.findMany({
@@ -925,39 +1015,50 @@ export async function getFraudAlerts(branchId?: string): Promise<FraudAlert[]> {
     for (const item of list) {
       try {
         const parsed = JSON.parse(item.value)
-        if (parsed && parsed.id) map.set(parsed.id, parsed)
+        if (parsed && parsed.id) {
+          if (businessId && parsed.businessId && parsed.businessId !== businessId) continue
+          map.set(parsed.id, parsed)
+        }
       } catch (e) {}
     }
     for (const a of runtimeFraudAlerts) {
+      if (businessId && a.businessId && a.businessId !== businessId) continue
       if (!map.has(a.id)) map.set(a.id, a)
     }
-    const all = Array.from(map.values()).sort(
+    let all = Array.from(map.values()).sort(
       (a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime()
     )
-    runtimeFraudAlerts = all
+    if (businessId) {
+      all = all.filter(a => !a.businessId || a.businessId === businessId)
+    }
 
     if (!branchId || branchId === "ALL") {
       return all
     }
     return all.filter(a => a.branchId === branchId)
   } catch (e) {
+    let all = runtimeFraudAlerts
+    if (businessId) all = all.filter(a => !a.businessId || a.businessId === businessId)
     if (!branchId || branchId === "ALL") {
-      return runtimeFraudAlerts
+      return all
     }
-    return runtimeFraudAlerts.filter(a => a.branchId === branchId)
+    return all.filter(a => a.branchId === branchId)
   }
 }
 
 export async function recordFraudAlert(payload: {
+  businessId?: string
   branchId: string
   deviceId: string
   alertType: FraudAlert["alertType"]
   message: string
 }): Promise<FraudAlert> {
-  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  const allBranches = await getBranches(payload.businessId)
+  const branch = allBranches.find(b => b.id === payload.branchId) || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
   const alert: FraudAlert = {
     id: `ALERT-${Date.now()}`,
+    businessId: payload.businessId,
     branchId: payload.branchId,
     branchName: branch.name,
     deviceId: payload.deviceId,
@@ -1003,15 +1104,17 @@ export async function recordFraudAlert(payload: {
 }
 
 export async function recordShiftClosing(payload: {
+  businessId?: string
   branchId: string
   cashierId: string
   cashierName: string
   physicalCash: number
   notes?: string
 }): Promise<ShiftClosing> {
-  const branch = runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  const allBranches = await getBranches(payload.businessId)
+  const branch = allBranches.find(b => b.id === payload.branchId) || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
 
-  const branchTxs = (await getTransactions(payload.branchId)).filter(t => 
+  const branchTxs = (await getTransactions(payload.branchId, payload.businessId)).filter(t => 
     t.branchId === payload.branchId &&
     t.paymentMethod === "CASH" &&
     t.status === "COMPLETED"
@@ -1021,6 +1124,7 @@ export async function recordShiftClosing(payload: {
 
   const closing: ShiftClosing = {
     id: `SHIFT-${Date.now()}`,
+    businessId: payload.businessId,
     branchId: payload.branchId,
     branchName: branch.name,
     cashierId: payload.cashierId,
@@ -1046,7 +1150,7 @@ export async function recordShiftClosing(payload: {
   return closing
 }
 
-export async function getShiftClosings(branchId?: string): Promise<ShiftClosing[]> {
+export async function getShiftClosings(branchId?: string, businessId?: string): Promise<ShiftClosing[]> {
   try {
     const { prisma } = await import("@/lib/prisma")
     const list = await prisma.systemSetting.findMany({
@@ -1056,26 +1160,36 @@ export async function getShiftClosings(branchId?: string): Promise<ShiftClosing[
     for (const item of list) {
       try {
         const parsed = JSON.parse(item.value)
-        if (parsed && parsed.id) map.set(parsed.id, parsed)
+        if (parsed && parsed.id) {
+          if (businessId && parsed.businessId && parsed.businessId !== businessId) continue
+          map.set(parsed.id, parsed)
+        }
       } catch (e) {}
     }
     for (const c of runtimeShiftClosings) {
+      if (businessId && c.businessId && c.businessId !== businessId) continue
       if (!map.has(c.id)) map.set(c.id, c)
     }
-    const all = Array.from(map.values()).sort(
+    let all = Array.from(map.values()).sort(
       (a, b) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime()
     )
-    runtimeShiftClosings = all
+    if (businessId) {
+      all = all.filter(c => !c.businessId || c.businessId === businessId)
+    }
 
     if (!branchId || branchId === "ALL") {
       return all
     }
     return all.filter(s => s.branchId === branchId)
   } catch (e) {
-    if (!branchId || branchId === "ALL") {
-      return runtimeShiftClosings
+    let all = runtimeShiftClosings
+    if (businessId) {
+      all = all.filter(c => !c.businessId || c.businessId === businessId)
     }
-    return runtimeShiftClosings.filter(s => s.branchId === branchId)
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(s => s.branchId === branchId)
   }
 }
 
@@ -1084,6 +1198,7 @@ export async function getShiftClosings(branchId?: string): Promise<ShiftClosing[
 // -------------------------------------------------------------
 export type BranchStaff = {
   id: string
+  businessId?: string
   branchId: string
   branchName: string
   name: string
@@ -1137,7 +1252,7 @@ export async function getUserAssignedBranch(userId?: string, userEmail?: string)
   return branches[0] || null
 }
 
-export async function getStaffListByBranch(branchId?: string): Promise<BranchStaff[]> {
+export async function getStaffListByBranch(branchId?: string, businessId?: string): Promise<BranchStaff[]> {
   try {
     const { prisma } = await import("@/lib/prisma")
     const list = await prisma.systemSetting.findMany({
@@ -1147,37 +1262,51 @@ export async function getStaffListByBranch(branchId?: string): Promise<BranchSta
     for (const item of list) {
       try {
         const parsed = JSON.parse(item.value)
-        if (parsed && parsed.id) map.set(parsed.id, parsed)
+        if (parsed && parsed.id) {
+          if (businessId && parsed.businessId && parsed.businessId !== businessId) continue
+          map.set(parsed.id, parsed)
+        }
       } catch (e) {}
     }
     for (const s of runtimeStaffs) {
+      if (businessId && s.businessId && s.businessId !== businessId) continue
+      if (businessId && !s.businessId) continue
       if (!map.has(s.id)) map.set(s.id, s)
     }
-    const all = Array.from(map.values())
-    runtimeStaffs = all
+    let all = Array.from(map.values())
+    if (businessId) {
+      all = all.filter(s => !s.businessId || s.businessId === businessId)
+    }
 
     if (!branchId || branchId === "ALL") {
       return all
     }
     return all.filter(s => s.branchId === branchId)
   } catch (e) {
-    if (!branchId || branchId === "ALL") {
-      return runtimeStaffs
+    let all = runtimeStaffs
+    if (businessId) {
+      all = all.filter(s => !s.businessId || s.businessId === businessId)
     }
-    return runtimeStaffs.filter(s => s.branchId === branchId)
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(s => s.branchId === branchId)
   }
 }
 
 export async function createStaffForBranch(data: {
+  businessId?: string
   branchId: string
   name: string
   email: string
   role: "KASIR" | "MANAGER"
   phone?: string
 }): Promise<BranchStaff> {
-  const branch = runtimeBranches.find(b => b.id === data.branchId) || DEFAULT_BRANCHES.find(b => b.id === data.branchId) || { id: data.branchId, name: "Cabang Outlet", location: "" }
+  const allBranches = await getBranches(data.businessId)
+  const branch = allBranches.find(b => b.id === data.branchId) || runtimeBranches.find(b => b.id === data.branchId) || DEFAULT_BRANCHES.find(b => b.id === data.branchId) || { id: data.branchId, name: "Cabang Outlet", location: "" }
   const newStaff: BranchStaff = {
     id: `staff-${Date.now()}`,
+    businessId: data.businessId,
     branchId: data.branchId,
     branchName: branch.name,
     name: data.name.trim(),

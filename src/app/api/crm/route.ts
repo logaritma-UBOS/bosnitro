@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server"
 import { getCustomers, upsertCustomer, generateWhatsAppReminderUrl } from "@/lib/crmDb"
+import { getTenantBusinessId } from "@/lib/interlockingDb"
+import { auth } from "@/auth"
 
 export async function GET(req: Request) {
   try {
+    const session = await auth()
+    const businessId = await getTenantBusinessId(session)
     const { searchParams } = new URL(req.url)
     const branchId = searchParams.get("branchId") || undefined
     const search = searchParams.get("search") || undefined
 
-    const customers = await getCustomers({ branchId, search })
+    const customers = await getCustomers({ branchId, search, businessId })
 
     return NextResponse.json({
       success: true,

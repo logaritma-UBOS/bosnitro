@@ -37,18 +37,20 @@ export async function POST(req: NextRequest) {
       }).catch(() => [])
       const sysMap = Object.fromEntries(sysSettings.map(s => [s.key, s.value]))
 
+      const isMeruvinLegacy = business?.name?.toLowerCase().includes("meruvin")
+
       if (!targetRecipient) {
-        targetRecipient = sysMap[`${scopeId}_store_telegram_phone`] || sysMap["store_telegram_phone"] || getActiveTelegramRecipient()
+        targetRecipient = sysMap[`${scopeId}_store_telegram_phone`] || (isMeruvinLegacy ? (sysMap["store_telegram_phone"] || getActiveTelegramRecipient()) : "")
       }
       if (!targetChatId) {
-        targetChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || sysMap["store_telegram_chat_id"] || getActiveTelegramChatId() || undefined
+        targetChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || (isMeruvinLegacy ? (sysMap["store_telegram_chat_id"] || getActiveTelegramChatId() || undefined) : undefined)
       }
       if (!targetBotToken) {
-        targetBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || sysMap["store_telegram_bot_token"] || process.env.TELEGRAM_BOT_TOKEN
+        targetBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || (isMeruvinLegacy ? (sysMap["store_telegram_bot_token"] || process.env.TELEGRAM_BOT_TOKEN) : undefined)
       }
     }
 
-    const result = await sendDailyBranchReportTelegram(branchId, targetRecipient, targetChatId, targetBotToken)
+    const result = await sendDailyBranchReportTelegram(branchId, targetRecipient, targetChatId, targetBotToken, scopeId)
 
     return NextResponse.json(result)
   } catch (error: any) {

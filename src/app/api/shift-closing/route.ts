@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { recordShiftClosing, getShiftClosings, recordFraudAlert } from "@/lib/interlockingDb"
+import { recordShiftClosing, getShiftClosings, recordFraudAlert, getTenantBusinessId } from "@/lib/interlockingDb"
 import { sendDailyBranchReportTelegram, sendTelegramAlert } from "@/lib/telegram"
 import { formatRupiah } from "@/lib/format"
 import { auth } from "@/auth"
@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
     const { branchId, physicalCash, notes } = body
 
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     const closing = await recordShiftClosing({
+      businessId,
       branchId,
       cashierId: session.user.id,
       cashierName: session.user.name || "Budi Kasir",
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
     })
 
     // 1. Auto-trigger Telegram report for this branch
-    sendDailyBranchReportTelegram(branchId).catch(console.error)
+    sendDailyBranchReportTelegram(branchId, undefined, undefined, undefined, businessId).catch(console.error)
 
     // 2. Auto-trigger Telegram fraud/discrepancy alert if physical cash doesn't match POS system
     if (closing.discrepancy !== 0) {
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
 
       // Automatically register in Fraud Alert list for executive monitoring
       recordFraudAlert({
+        businessId,
         branchId,
         deviceId: `POS-${closing.cashierId || "CASHIER"}`,
         alertType: "DISCREPANCY",
@@ -62,9 +65,11 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth()
+    const businessId = await getTenantBusinessId(session)
     const { searchParams } = new URL(req.url)
     const branchId = searchParams.get("branchId") || undefined
-    const closings = await getShiftClosings(branchId)
+    const closings = await getShiftClosings(branchId && branchId !== "ALL" ? branchId : undefined, businessId)
     return NextResponse.json(closings)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

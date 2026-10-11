@@ -3,7 +3,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { getStaffListByBranch, createStaffForBranch, deleteStaffFromBranch } from "@/lib/interlockingDb"
+import { getStaffListByBranch, createStaffForBranch, deleteStaffFromBranch, getTenantBusinessId } from "@/lib/interlockingDb"
 
 export async function getStaffList(branchId?: string) {
   try {
@@ -15,10 +15,11 @@ export async function getStaffList(branchId?: string) {
       throw new Error("Hanya Pemilik yang bisa mengakses menu ini")
     }
 
+    const businessId = await getTenantBusinessId(session)
     const staffMap = new Map<string, any>()
 
     // 1. Load from durable systemSetting / runtime
-    const systemStaffs = await getStaffListByBranch(branchId)
+    const systemStaffs = await getStaffListByBranch(branchId, businessId)
     for (const s of systemStaffs) {
       if (s && s.id) staffMap.set(s.id, s)
     }
@@ -50,11 +51,16 @@ export async function getStaffList(branchId?: string) {
     if (!branchId || branchId === "ALL") return all
     return all.filter(s => s.branchId === branchId)
   } catch (err) {
-    return await getStaffListByBranch(branchId)
+    const session = await auth()
+    const businessId = session?.user?.id ? await getTenantBusinessId(session) : undefined
+    return await getStaffListByBranch(branchId, businessId)
   }
 }
 
 export async function createStaff(formData: FormData) {
+  const session = await auth()
+  const businessId = session?.user?.id ? await getTenantBusinessId(session) : undefined
+
   const name = formData.get("name") as string
   const email = formData.get("email") as string
   const password = formData.get("password") as string
@@ -67,6 +73,7 @@ export async function createStaff(formData: FormData) {
 
   // Record in branch-scoped store
   await createStaffForBranch({
+    businessId,
     branchId,
     name,
     email,

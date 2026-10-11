@@ -1,9 +1,7 @@
 export const dynamic = "force-dynamic"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
-import { getTransactions, getFraudAlerts } from "@/lib/interlockingDb"
-import { prisma } from "@/lib/prisma"
-import { DEFAULT_TELEGRAM_RECIPIENT } from "@/lib/telegram"
+import { getTransactions, getFraudAlerts, getStoreSettings, getTenantBusinessId } from "@/lib/interlockingDb"
 import OwnerDashboardInterlockingClient from "./OwnerDashboardInterlockingClient"
 
 export default async function BerandaPage() {
@@ -15,19 +13,21 @@ export default async function BerandaPage() {
     redirect("/kasir")
   }
 
-  const [transactions, alerts, user] = await Promise.all([
-    getTransactions(),
-    getFraudAlerts(),
-    prisma.user.findUnique({ where: { id: session.user.id }, select: { phone: true } }),
-  ])
+  const businessId = await getTenantBusinessId(session)
+  const storeSettings = await getStoreSettings(businessId)
 
-  const initialTelegramPhone = user?.phone?.trim() || DEFAULT_TELEGRAM_RECIPIENT
+  const [transactions, alerts] = await Promise.all([
+    getTransactions("ALL", businessId),
+    getFraudAlerts("ALL", businessId),
+  ])
 
   return (
     <OwnerDashboardInterlockingClient
+      businessId={businessId}
       initialTransactions={transactions}
       initialAlerts={alerts}
-      initialTelegramPhone={initialTelegramPhone}
+      initialTelegramPhone={storeSettings.telegramPhone || ""}
+      initialTelegramChatId={storeSettings.telegramChatId || null}
     />
   )
 }

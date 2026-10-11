@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getExpenses, recordExpense, deleteBranchExpense } from "@/lib/interlockingDb"
+import { getExpenses, recordExpense, deleteBranchExpense, getTenantBusinessId } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth()
+    const businessId = await getTenantBusinessId(session)
     const { searchParams } = new URL(req.url)
     const branchId = searchParams.get("branchId") || undefined
 
-    const expenses = await getExpenses(branchId && branchId !== "ALL" ? branchId : undefined)
+    const expenses = await getExpenses(branchId && branchId !== "ALL" ? branchId : undefined, businessId)
 
     return NextResponse.json({
       success: true,
@@ -21,6 +23,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth()
+    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
     const { branchId, category, amount, description } = body
 
@@ -29,6 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const expense = await recordExpense({
+      businessId,
       branchId,
       category,
       amount: Number(amount),

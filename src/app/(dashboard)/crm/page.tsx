@@ -1,4 +1,7 @@
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 import { getCustomers } from "@/lib/crmDb"
+import { getTenantBusinessId } from "@/lib/interlockingDb"
 import CrmClient from "./CrmClient"
 
 export const metadata = {
@@ -7,6 +10,10 @@ export const metadata = {
 }
 
 export default async function CrmPage() {
-  const initialCustomers = await getCustomers()
+  const session = await auth()
+  if (!session?.user?.id) redirect("/login")
+  const businessId = await getTenantBusinessId(session)
+
+  const initialCustomers = await getCustomers({ businessId })
   return <CrmClient initialCustomers={initialCustomers} />
 }

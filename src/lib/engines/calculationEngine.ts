@@ -12,8 +12,8 @@ export async function calculateOmzet(businessId: string, startDate: Date, endDat
     dbOmzet = sales._sum.totalAmount || 0
   } catch (e) {}
 
-  // Tarik transaksi masuk dari semua cabang di sistem interlocking
-  const liveTxs = await getTransactions("ALL")
+  // Tarik transaksi masuk dari semua cabang di sistem interlocking khusus bisnis ini
+  const liveTxs = await getTransactions("ALL", businessId)
   const liveOmzet = liveTxs
     .filter(t => {
       const d = new Date(t.createdAt)
@@ -32,7 +32,7 @@ export async function calculateTransactionCount(businessId: string, startDate: D
     })
   } catch (e) {}
 
-  const liveTxs = await getTransactions("ALL")
+  const liveTxs = await getTransactions("ALL", businessId)
   const liveCount = liveTxs.filter(t => {
     const d = new Date(t.createdAt)
     return d >= startDate && d <= endDate && t.status === "COMPLETED"
@@ -61,7 +61,7 @@ export async function calculateTotalHPP(businessId: string, startDate: Date, end
     }
   } catch (e) {}
 
-  const liveTxs = await getTransactions("ALL")
+  const liveTxs = await getTransactions("ALL", businessId)
   const liveHpp = liveTxs
     .filter(t => {
       const d = new Date(t.createdAt)
@@ -83,8 +83,8 @@ export async function calculateExpenses(businessId: string, startDate: Date, end
     dbExpenses = expenses._sum.amount || 0
   } catch (e) {}
 
-  // Tarik data transaksi keluar (pengeluaran) dari masing-masing cabang terakumulasi
-  const liveExpenses = await getExpenses("ALL")
+  // Tarik data transaksi keluar (pengeluaran) dari masing-masing cabang terakumulasi khusus bisnis ini
+  const liveExpenses = await getExpenses("ALL", businessId)
   const liveExp = liveExpenses
     .filter(e => {
       const d = new Date(e.date)

@@ -1,6 +1,7 @@
 import AppShellClient from "@/components/layout/AppShellClient"
 import { BranchProvider } from "@/context/BranchContext"
 import { auth } from "@/auth"
+import { getTenantBusinessId } from "@/lib/interlockingDb"
 
 /**
  * AppShell — Wrapper for all authenticated app pages with BranchContext.
@@ -15,9 +16,10 @@ export default async function AppShell({
 }) {
   const session = await auth()
   const role = session?.user?.role || "OWNER"
+  const businessId = await getTenantBusinessId(session)
 
   return (
-    <BranchProvider>
+    <BranchProvider businessId={businessId}>
       <AppShellClient businessName={businessName} role={role}>
         {children}
       </AppShellClient>

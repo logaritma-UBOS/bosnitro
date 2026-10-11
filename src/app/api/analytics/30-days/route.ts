@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server"
 import { getHardwareSettings } from "@/lib/hardwareSettings"
-import { getTransactions } from "@/lib/interlockingDb"
+import { getTransactions, getTenantBusinessId } from "@/lib/interlockingDb"
 import { Analytics30Days, InterlockingTransaction } from "@/types/branch"
+import { auth } from "@/auth"
 
 export async function GET(req: Request) {
   try {
+    const session = await auth()
+    const businessId = await getTenantBusinessId(session)
     const { searchParams } = new URL(req.url)
     const branchId = searchParams.get("branchId") // optional filter for specific branch or all
     const settings = await getHardwareSettings(branchId && branchId !== "ALL" ? branchId : undefined)
@@ -13,8 +16,8 @@ export async function GET(req: Request) {
     const rewardBonusPool = settings.rewardBonusPool || 2000000
     const rewardCriteria = settings.rewardCriteria || "DAILY_AVG_TARGET"
 
-    // Retrieve all transactions (scoped by branch if specified)
-    const allTrx: InterlockingTransaction[] = await getTransactions(branchId && branchId !== "ALL" ? branchId : undefined)
+    // Retrieve all transactions (scoped by business and branch if specified)
+    const allTrx: InterlockingTransaction[] = await getTransactions(branchId && branchId !== "ALL" ? branchId : undefined, businessId)
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 

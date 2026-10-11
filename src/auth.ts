@@ -127,14 +127,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role
         token.staffBusinessId = (user as any).staffBusinessId || null
         
-        // Coba ambil dari DB jika oauth
-        if (!(user as any).staffBusinessId) {
-          const dbUser = await prisma.user.findUnique({ where: { id: user.id } })
+        let businessId = token.staffBusinessId || (user as any).businessId || null
+        if (!businessId) {
+          const dbUser = await prisma.user.findUnique({ 
+            where: { id: user.id },
+            include: { businesses: { select: { id: true }, take: 1 } }
+          })
           if (dbUser) {
             token.role = dbUser.role
             token.staffBusinessId = dbUser.staffBusinessId
+            businessId = dbUser.staffBusinessId || dbUser.businesses[0]?.id || dbUser.id
           }
         }
+        token.businessId = businessId || user.id
         
         // Simpan hari login untuk fitur "Wajib login tiap hari" (Reset tengah malam)
         token.loginDateStr = currentDayStr;
@@ -155,6 +160,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.staffBusinessId = token.staffBusinessId as string | null
+        session.user.businessId = (token.businessId as string) || (token.staffBusinessId as string) || (token.id as string)
       }
       return session
     },

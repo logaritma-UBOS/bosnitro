@@ -1,4 +1,6 @@
-import { getTransactions, getFraudAlerts } from "@/lib/interlockingDb"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
+import { getTransactions, getFraudAlerts, getTenantBusinessId } from "@/lib/interlockingDb"
 import AuditFraudClient from "./AuditFraudClient"
 
 export const metadata = {
@@ -7,8 +9,12 @@ export const metadata = {
 }
 
 export default async function AuditFraudPage() {
-  const transactions = await getTransactions()
-  const alerts = await getFraudAlerts()
+  const session = await auth()
+  if (!session?.user?.id) redirect("/login")
+  const businessId = await getTenantBusinessId(session)
+
+  const transactions = await getTransactions("ALL", businessId)
+  const alerts = await getFraudAlerts("ALL", businessId)
 
   return (
     <AuditFraudClient

@@ -2,8 +2,10 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { Branch, DEFAULT_BRANCHES } from "@/types/branch"
+import { setActiveBusinessId } from "@/lib/transactionStore"
 
 type BranchContextType = {
+  businessId?: string
   branches: Branch[]
   selectedBranch: Branch
   selectedBranchId: string
@@ -18,11 +20,17 @@ type BranchContextType = {
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined)
 
-const STORAGE_KEY = "ubos_selected_branch_id"
-const BRANCHES_STORAGE_KEY = "bosnitro_branches_list"
-const BRANCH_EVENT_NAME = "bosnitro_branches_sync"
+export function BranchProvider({ children, businessId }: { children: React.ReactNode; businessId?: string }) {
+  const STORAGE_KEY = businessId ? `ubos_selected_branch_id_${businessId}` : "ubos_selected_branch_id"
+  const BRANCHES_STORAGE_KEY = businessId ? `bosnitro_branches_list_${businessId}` : "bosnitro_branches_list"
+  const BRANCH_EVENT_NAME = businessId ? `bosnitro_branches_sync_${businessId}` : "bosnitro_branches_sync"
 
-export function BranchProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (businessId) {
+      setActiveBusinessId(businessId)
+    }
+  }, [businessId])
+
   const [branches, setBranches] = useState<Branch[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -30,15 +38,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         if (cached) {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const map = new Map<string, Branch>()
-            for (const b of DEFAULT_BRANCHES) map.set(b.id, b)
-            for (const b of parsed) if (b && b.id) map.set(b.id, b)
-            return Array.from(map.values())
+            return parsed
           }
         }
       } catch (e) {}
     }
-    return DEFAULT_BRANCHES
+    return businessId ? [] : DEFAULT_BRANCHES
   })
 
   const [selectedBranchId, setSelectedBranchIdState] = useState<string>(() => {
@@ -48,7 +53,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         if (saved && saved !== "ALL") return saved
       } catch (e) {}
     }
-    return DEFAULT_BRANCHES[0].id
+    return branches[0]?.id || "branch-utama"
   })
 
   const [isAllBranches, setIsAllBranches] = useState<boolean>(() => {
@@ -86,11 +91,14 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const serverData: Branch[] = await res.json()
         if (Array.isArray(serverData)) {
-          // Merge server data, local branches, and default branches (NEVER wipe any branch!)
+          // Merge server data and local branches
           const branchMap = new Map<string, Branch>()
-          for (const b of DEFAULT_BRANCHES) branchMap.set(b.id, b)
           for (const b of serverData) if (b && b.id) branchMap.set(b.id, b)
-          for (const b of localBranches) if (b && b.id) branchMap.set(b.id, b)
+          for (const b of localBranches) if (b && b.id && (!businessId || !b.businessId || b.businessId === businessId)) branchMap.set(b.id, b)
+
+          if (branchMap.size === 0 && !businessId) {
+            for (const b of DEFAULT_BRANCHES) branchMap.set(b.id, b)
+          }
 
           const merged = Array.from(branchMap.values())
           setBranches(merged)
@@ -113,7 +121,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         setBranches(localBranches)
       }
     }
-  }, [])
+  }, [BRANCHES_STORAGE_KEY, BRANCH_EVENT_NAME, businessId])
 
   useEffect(() => {
     refreshBranches()
@@ -217,6 +225,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
   return (
     <BranchContext.Provider
       value={{
+        businessId,
         branches,
         selectedBranch,
         selectedBranchId,

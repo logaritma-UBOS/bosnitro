@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { saveTransactionsBatch, getTransactions } from "@/lib/interlockingDb"
+import { saveTransactionsBatch, getTransactions, getTenantBusinessId } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
 export async function POST(req: NextRequest) {
@@ -9,14 +9,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
     const { transactions, branchId } = body
 
     if (Array.isArray(transactions) && transactions.length > 0) {
-      await saveTransactionsBatch(transactions)
+      await saveTransactionsBatch(transactions, businessId)
     }
 
-    const all = await getTransactions(branchId && branchId !== "ALL" ? branchId : undefined)
+    const all = await getTransactions(branchId && branchId !== "ALL" ? branchId : undefined, businessId)
 
     return NextResponse.json({
       success: true,

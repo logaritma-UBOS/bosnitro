@@ -1,5 +1,6 @@
 export type Branch = {
   id: string
+  businessId?: string
   name: string
   location: string
   deviceId?: string | null
@@ -50,6 +51,7 @@ export type InterlockingProduct = {
 
 export type InterlockingTransaction = {
   id: string
+  businessId?: string
   branchId: string
   branchName?: string
   cashierId?: string | null
@@ -82,6 +84,7 @@ export type InterlockingTransactionItem = {
 
 export type FraudAlert = {
   id: string
+  businessId?: string
   branchId: string
   branchName: string
   deviceId: string
@@ -92,6 +95,7 @@ export type FraudAlert = {
 
 export type ShiftClosing = {
   id: string
+  businessId?: string
   branchId: string
   branchName: string
   cashierId: string
@@ -157,6 +161,7 @@ export type HardwareSettings = {
 // -------------------------------------------------------------
 export type CustomerCRM = {
   id: string
+  businessId?: string
   name: string
   phone: string
   plateNumber: string

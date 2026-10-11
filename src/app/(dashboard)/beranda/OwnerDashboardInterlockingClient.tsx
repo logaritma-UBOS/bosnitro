@@ -42,18 +42,22 @@ import {
 } from "lucide-react"
 
 export default function OwnerDashboardInterlockingClient({
+  businessId,
   initialTransactions,
   initialAlerts,
   initialTelegramPhone,
+  initialTelegramChatId,
 }: {
+  businessId?: string
   initialTransactions: InterlockingTransaction[]
   initialAlerts: FraudAlert[]
   initialTelegramPhone?: string
+  initialTelegramChatId?: string | null
 }) {
   const { branches, selectedBranch, selectedBranchId, isAllBranches, deleteBranchState, refreshBranches } = useBranch()
   const [transactions, setTransactions] = useState<InterlockingTransaction[]>(() => {
     if (typeof window !== "undefined") {
-      const local = getLocalTransactions()
+      const local = getLocalTransactions(undefined, businessId)
       if (local.length > 0) {
         const map = new Map<string, InterlockingTransaction>()
         for (const t of initialTransactions) {
@@ -80,14 +84,16 @@ export default function OwnerDashboardInterlockingClient({
   const [analytics30Days, setAnalytics30Days] = useState<Analytics30Days | null>(null)
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
 
-  // Dynamic Telegram info
-  const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "083153598697")
-  const [telegramChatId, setTelegramChatId] = useState<string | null>("-5332437584")
+  // Dynamic Telegram info (scoped per business)
+  const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "")
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(initialTelegramChatId || null)
   const [telegramBotToken, setTelegramBotToken] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      const dedicated = localStorage.getItem("bosnitro_telegram_bot_token")
+      const botKey = businessId ? `bosnitro_telegram_bot_token_${businessId}` : "bosnitro_telegram_bot_token"
+      const settingsKey = businessId ? `ubos_store_settings_${businessId}` : "ubos_store_settings"
+      const dedicated = localStorage.getItem(botKey)
       if (dedicated) return dedicated
-      const saved = localStorage.getItem("ubos_store_settings")
+      const saved = localStorage.getItem(settingsKey)
       if (saved) {
         try {
           const parsed = JSON.parse(saved)
@@ -101,19 +107,22 @@ export default function OwnerDashboardInterlockingClient({
 
   const refreshDashboardTransactions = async () => {
     // Sync complete transactions pool so both multi-branch overview cards and individual branch filters remain accurate
-    const synced = await syncTransactions("ALL")
+    const synced = await syncTransactions("ALL", businessId)
     setTransactions(synced || [])
   }
 
   useEffect(() => {
     refreshDashboardTransactions()
 
+    const botKey = businessId ? `bosnitro_telegram_bot_token_${businessId}` : "bosnitro_telegram_bot_token"
+    const settingsKey = businessId ? `ubos_store_settings_${businessId}` : "ubos_store_settings"
+
     // Immediate check from localStorage
     let localBotToken: string | null = null
     try {
-      localBotToken = localStorage.getItem("bosnitro_telegram_bot_token")
+      localBotToken = localStorage.getItem(botKey)
       if (!localBotToken) {
-        const saved = localStorage.getItem("ubos_store_settings")
+        const saved = localStorage.getItem(settingsKey)
         if (saved) {
           const p = JSON.parse(saved)
           if (p.telegramBotToken) localBotToken = p.telegramBotToken
@@ -128,30 +137,18 @@ export default function OwnerDashboardInterlockingClient({
       .then((res) => res.json())
       .then((data) => {
         if (data.telegramPhone) setTelegramPhone(data.telegramPhone)
-        if (data.telegramChatId) setTelegramChatId(data.telegramChatId)
+        setTelegramChatId(data.telegramChatId || null)
         
         const effectiveToken = data.telegramBotToken || localBotToken || null
         if (effectiveToken) {
           setTelegramBotToken(effectiveToken)
           try {
-            localStorage.setItem("bosnitro_telegram_bot_token", effectiveToken)
+            localStorage.setItem(botKey, effectiveToken)
           } catch (e) {}
         }
 
-        // If client has token but server returned null (e.g. serverless cold container restart), auto-heal server
-        if (localBotToken && !data.telegramBotToken) {
-          fetch("/api/settings/store", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              storeName: data.storeName || "BOSNITRO",
-              telegramBotToken: localBotToken,
-            }),
-          }).catch(() => {})
-        }
-
         try {
-          const userKey = data.userId || data.userEmail || "default"
+          const userKey = data.userId || data.userEmail || businessId || "default"
           const existingSaved = localStorage.getItem(`ubos_store_settings_${userKey}`)
           let prevParsed: any = {}
           if (existingSaved) {
@@ -166,7 +163,7 @@ export default function OwnerDashboardInterlockingClient({
             telegramBotToken: finalToken,
           }
           localStorage.setItem(`ubos_store_settings_${userKey}`, JSON.stringify(payload))
-          localStorage.setItem("ubos_store_settings", JSON.stringify(payload))
+          localStorage.setItem(settingsKey, JSON.stringify(payload))
         } catch (e) {}
       })
       .catch(() => {})
@@ -362,7 +359,7 @@ export default function OwnerDashboardInterlockingClient({
               <span>
                 {sendingTelegram
                   ? "Mengirim Laporan..."
-                  : `Kirim Laporan Telegram (${telegramChatId ? `Grup ${telegramChatId}` : telegramPhone})`}
+                  : `Kirim Laporan Telegram (${telegramChatId ? `Grup ${telegramChatId}` : (telegramPhone ? telegramPhone : "Belum Diatur")})`}
               </span>
             </button>
           )}

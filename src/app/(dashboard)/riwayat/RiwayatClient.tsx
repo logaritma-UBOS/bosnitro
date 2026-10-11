@@ -29,8 +29,9 @@ import {
   CheckCircle2,
 } from "lucide-react"
 
-export default function RiwayatClient() {
-  const { selectedBranch, selectedBranchId, isAllBranches } = useBranch()
+export default function RiwayatClient({ businessId: propBusinessId }: { businessId?: string } = {}) {
+  const { selectedBranch, selectedBranchId, isAllBranches, businessId: contextBusinessId } = useBranch()
+  const businessId = propBusinessId || contextBusinessId
   const [transactions, setTransactions] = useState<InterlockingTransaction[]>([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState<"today" | "7d" | "30d" | "all">("today")
@@ -40,13 +41,13 @@ export default function RiwayatClient() {
     const branchParam = isAllBranches ? "ALL" : selectedBranchId
 
     // 1. Instant local render (Zero loading delay)
-    const localCached = getLocalTransactions(branchParam)
+    const localCached = getLocalTransactions(branchParam, businessId)
     setTransactions(localCached)
     setLoading(localCached.length === 0)
 
     try {
       // 2. Perform two-way sync with server
-      const syncedList = await syncTransactions(branchParam)
+      const syncedList = await syncTransactions(branchParam, businessId)
 
       // 3. Merge pending offline transactions if any
       const queue = getPendingTransactions()
@@ -93,7 +94,7 @@ export default function RiwayatClient() {
 
       setTransactions(merged)
       if (merged.length > 0) {
-        saveLocalTransactions(merged)
+        saveLocalTransactions(merged, businessId)
       }
     } catch (e) {
       console.error(e)
@@ -108,9 +109,9 @@ export default function RiwayatClient() {
     // Real-time listener for transactions created across windows/tabs/POS
     const unsubscribe = subscribeTransactions(() => {
       fetchTransactions()
-    })
+    }, businessId)
     return () => unsubscribe()
-  }, [selectedBranchId, isAllBranches])
+  }, [selectedBranchId, isAllBranches, businessId])
 
   // Filter based on date & strict branch isolation
   const filteredTransactions = useMemo(() => {

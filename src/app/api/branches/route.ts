@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getBranches, createBranch, updateBranch, deleteBranch, saveBranchesBatch } from "@/lib/interlockingDb"
+import { getBranches, createBranch, updateBranch, deleteBranch, saveBranchesBatch, getTenantBusinessId } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
 export async function GET() {
   try {
-    const branches = await getBranches()
+    const session = await auth()
+    const businessId = await getTenantBusinessId(session)
+    const branches = await getBranches(businessId)
     return NextResponse.json(branches)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -18,6 +20,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Hanya Owner yang dapat mengubah data cabang" }, { status: 403 })
     }
 
+    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
     const { id, name, location, deviceId } = body
 
@@ -28,11 +31,15 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Nama cabang wajib diisi" }, { status: 400 })
     }
 
-    const updated = await updateBranch(id, {
-      name: name.trim(),
-      location: (location || "").trim(),
-      deviceId: deviceId?.trim(),
-    })
+    const updated = await updateBranch(
+      id,
+      {
+        name: name.trim(),
+        location: (location || "").trim(),
+        deviceId: deviceId?.trim(),
+      },
+      businessId
+    )
 
     if (!updated) {
       return NextResponse.json({ error: "Cabang tidak ditemukan" }, { status: 404 })
@@ -52,11 +59,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
 
     // Support batch branches auto-heal / sync
     if (Array.isArray(body.branches)) {
-      const synced = await saveBranchesBatch(body.branches)
+      const synced = await saveBranchesBatch(body.branches, businessId)
       return NextResponse.json({ success: true, branches: synced })
     }
 
@@ -68,6 +76,7 @@ export async function POST(req: NextRequest) {
 
     const branch = await createBranch({
       id: id?.trim(),
+      businessId,
       name: name.trim(),
       location: (location || "Outlet").trim(),
       deviceId: deviceId?.trim(),
@@ -87,6 +96,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Hanya Owner yang dapat menghapus cabang" }, { status: 403 })
     }
 
+    const businessId = await getTenantBusinessId(session)
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
 
@@ -94,7 +104,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "ID Cabang wajib disertakan" }, { status: 400 })
     }
 
-    const success = await deleteBranch(id)
+    const success = await deleteBranch(id, businessId)
     if (!success) {
       return NextResponse.json({ error: "Cabang utama tidak dapat dihapus jika hanya tersisa 1 cabang" }, { status: 400 })
     }

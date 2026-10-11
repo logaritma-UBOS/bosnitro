@@ -633,7 +633,7 @@ export default function StoreSettingsClient({
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Masukkan token dari <strong>@BotFather</strong> dan pastikan bot telah diundang ke grup Telegram toko (<strong>{telegramChatId || "-5332437584"}</strong>) agar laporan terkirim 100% otomatis.
+                  Masukkan token dari <strong>@BotFather</strong> dan pastikan bot telah diundang ke grup Telegram toko {telegramChatId ? (<strong>({telegramChatId})</strong>) : ""} agar laporan terkirim 100% otomatis.
                 </p>
               </div>
 

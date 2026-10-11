@@ -72,13 +72,13 @@ export async function sendTelegramAlert(message: string): Promise<boolean> {
 /**
  * Generate formatted Daily Transaction & Anti-Loss Report text for a branch or all branches
  */
-export async function generateDailyBranchReportText(branchId?: string, recipientPhone?: string): Promise<{
+export async function generateDailyBranchReportText(branchId?: string, recipientPhone?: string, businessId?: string): Promise<{
   reportText: string
   branchName: string
   totalRevenue: number
   txCount: number
 }> {
-  const branches = await getBranches()
+  const branches = await getBranches(businessId)
   const targetBranch = branchId && branchId !== "ALL" 
     ? branches.find(b => b.id === branchId) || DEFAULT_BRANCHES.find(b => b.id === branchId)
     : null
@@ -87,9 +87,9 @@ export async function generateDailyBranchReportText(branchId?: string, recipient
   const targetPhone = recipientPhone || activeTelegramRecipient
 
   const [allTx, allClosings, allAlerts] = await Promise.all([
-    getTransactions(branchId && branchId !== "ALL" ? branchId : undefined),
-    getShiftClosings(branchId && branchId !== "ALL" ? branchId : undefined),
-    getFraudAlerts(branchId && branchId !== "ALL" ? branchId : undefined),
+    getTransactions(branchId && branchId !== "ALL" ? branchId : undefined, businessId),
+    getShiftClosings(branchId && branchId !== "ALL" ? branchId : undefined, businessId),
+    getFraudAlerts(branchId && branchId !== "ALL" ? branchId : undefined, businessId),
   ])
 
   const totalRevenue = allTx.reduce((sum, t) => sum + t.totalAmount, 0)
@@ -189,7 +189,8 @@ export async function sendDailyBranchReportTelegram(
   branchId?: string,
   targetRecipient?: string,
   targetChatId?: string,
-  customBotToken?: string
+  customBotToken?: string,
+  businessId?: string
 ): Promise<{
   success: boolean
   sentAutomatic?: boolean
@@ -201,27 +202,39 @@ export async function sendDailyBranchReportTelegram(
   whatsappUrl: string
 }> {
   const recipient = targetRecipient || activeTelegramRecipient
-  let destinationChatId = targetChatId || activeTelegramChatId || process.env.TELEGRAM_CHAT_ID
+  let destinationChatId = targetChatId || (businessId ? undefined : activeTelegramChatId) || (businessId ? undefined : process.env.TELEGRAM_CHAT_ID)
 
   // If destinationChatId is still missing, attempt to fetch from DB
   if (!destinationChatId) {
     try {
       const { prisma } = await import("@/lib/prisma")
-      const sysChat = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_chat_id" } })
-      if (sysChat?.value) destinationChatId = sysChat.value
+      if (businessId) {
+        const sysChat = await prisma.systemSetting.findUnique({ where: { key: `${businessId}_store_telegram_chat_id` } })
+        if (sysChat?.value) destinationChatId = sysChat.value
+      }
+      if (!destinationChatId && !businessId) {
+        const sysChat = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_chat_id" } })
+        if (sysChat?.value) destinationChatId = sysChat.value
+      }
     } catch (e) {}
   }
 
-  let botToken = customBotToken || process.env.TELEGRAM_BOT_TOKEN
+  let botToken = customBotToken || (businessId ? undefined : process.env.TELEGRAM_BOT_TOKEN)
   if (!botToken) {
     try {
       const { prisma } = await import("@/lib/prisma")
-      const sysToken = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_bot_token" } })
-      if (sysToken?.value) botToken = sysToken.value
+      if (businessId) {
+        const sysToken = await prisma.systemSetting.findUnique({ where: { key: `${businessId}_store_telegram_bot_token` } })
+        if (sysToken?.value) botToken = sysToken.value
+      }
+      if (!botToken) {
+        const sysToken = await prisma.systemSetting.findUnique({ where: { key: "store_telegram_bot_token" } })
+        if (sysToken?.value) botToken = sysToken.value
+      }
     } catch (e) {}
   }
 
-  const { reportText, branchName } = await generateDailyBranchReportText(branchId, recipient)
+  const { reportText, branchName } = await generateDailyBranchReportText(branchId, recipient, businessId)
 
   // Direct share link to Telegram
   const cleanTextForUrl = reportText

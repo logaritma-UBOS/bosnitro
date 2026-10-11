@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { recordTransaction } from "@/lib/interlockingDb"
+import { recordTransaction, getTenantBusinessId } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
+    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
     const {
       branchId,
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tx = await recordTransaction({
+      businessId,
       branchId,
       cashierId: session?.user?.id || null,
       cashierName: session?.user?.name || (session?.user?.role === "KASIR" ? "Budi Kasir" : "Kasir Outlet"),

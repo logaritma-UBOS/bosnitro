@@ -59,9 +59,9 @@ export default async function StoreSettingsPage() {
 
   const storeName = sysMap[`${scopeId}_store_name`] || business?.name || (isMeruvinLegacy ? (sysMap["store_name"] || "MERUVIN") : "Toko Saya")
   const profileImage = user?.image || sysMap[`${scopeId}_store_profile_image`] || (isMeruvinLegacy ? sysMap["store_profile_image"] : null)
-  const telegramPhone = sysMap[`${scopeId}_store_telegram_phone`] || sysMap["store_telegram_phone"] || user?.phone?.trim() || runtime.telegramPhone || (isMeruvinLegacy ? "083153598697" : "")
-  const telegramChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || sysMap["store_telegram_chat_id"] || runtime.telegramChatId || (isMeruvinLegacy ? "-5332437584" : null)
-  const telegramBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || sysMap["store_telegram_bot_token"] || runtime.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || null
+  const telegramPhone = sysMap[`${scopeId}_store_telegram_phone`] || (isMeruvinLegacy ? (sysMap["store_telegram_phone"] || user?.phone?.trim() || runtime.telegramPhone || "083153598697") : (user?.phone?.trim() || ""))
+  const telegramChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || (isMeruvinLegacy ? (sysMap["store_telegram_chat_id"] || runtime.telegramChatId || "-5332437584") : null)
+  const telegramBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || (isMeruvinLegacy ? (sysMap["store_telegram_bot_token"] || runtime.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || null) : null)
 
   if (telegramPhone) {
     setActiveTelegramRecipient(telegramPhone)

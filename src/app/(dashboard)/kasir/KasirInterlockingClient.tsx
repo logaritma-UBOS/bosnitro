@@ -51,13 +51,16 @@ type CartItem = {
 }
 
 export default function KasirInterlockingClient({
+  businessId: propBusinessId,
   initialProducts,
   user,
 }: {
+  businessId?: string
   initialProducts: InterlockingProduct[]
   user?: { name?: string | null; role?: string | null }
 }) {
-  const { selectedBranch, selectedBranchId, isAllBranches, setSelectedBranchId, branches } = useBranch()
+  const { selectedBranch, selectedBranchId, isAllBranches, setSelectedBranchId, branches, businessId: contextBusinessId } = useBranch()
+  const businessId = propBusinessId || contextBusinessId
   const [products, setProducts] = useState<InterlockingProduct[]>(initialProducts)
 
   // Enforce specific branch selection in POS (Kasir never operates in ALL mode)
@@ -279,6 +282,7 @@ export default function KasirInterlockingClient({
         : (branches[0]?.id || "branch-utama")
 
       const payload = {
+        businessId,
         branchId: effectiveBranchId,
         items: cart.map((c) => ({
           productId: c.product.id,
@@ -310,7 +314,7 @@ export default function KasirInterlockingClient({
       const tx: InterlockingTransaction = data.transaction
       setCompletedTx(tx)
       setLastCart([...cart])
-      saveLocalTransactions([tx])
+      saveLocalTransactions([tx], businessId)
 
       // Trigger IoT Solenoid Valve if Nitrogen was in cart
       if (hasNitrogenInCart && nitrogenItem) {
