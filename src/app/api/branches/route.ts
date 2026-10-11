@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getBranches, createBranch, updateBranch, deleteBranch } from "@/lib/interlockingDb"
+import { getBranches, createBranch, updateBranch, deleteBranch, saveBranchesBatch } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
 export async function GET() {
@@ -53,13 +53,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, location, deviceId } = body
+
+    // Support batch branches auto-heal / sync
+    if (Array.isArray(body.branches)) {
+      const synced = await saveBranchesBatch(body.branches)
+      return NextResponse.json({ success: true, branches: synced })
+    }
+
+    const { id, name, location, deviceId } = body
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "Nama cabang wajib diisi" }, { status: 400 })
     }
 
     const branch = await createBranch({
+      id: id?.trim(),
       name: name.trim(),
       location: (location || "Outlet").trim(),
       deviceId: deviceId?.trim(),

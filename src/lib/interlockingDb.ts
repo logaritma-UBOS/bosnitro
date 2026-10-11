@@ -209,23 +209,51 @@ export async function getBranches(): Promise<Branch[]> {
   return runtimeBranches
 }
 
-export async function createBranch(data: { name: string; location: string; deviceId?: string }): Promise<Branch> {
+export async function saveBranchesBatch(branches: Branch[]): Promise<Branch[]> {
+  if (!Array.isArray(branches) || branches.length === 0) return await getBranches()
+  const map = new Map<string, Branch>()
+  for (const b of DEFAULT_BRANCHES) map.set(b.id, b)
+  for (const b of runtimeBranches) if (b && b.id) map.set(b.id, b)
+  for (const b of branches) if (b && b.id) map.set(b.id, b)
+
+  const merged = Array.from(map.values())
+  runtimeBranches = merged
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: "bosnitro_branches_list" },
+      update: { value: JSON.stringify(runtimeBranches) },
+      create: { id: "sys-branches-list", key: "bosnitro_branches_list", value: JSON.stringify(runtimeBranches) }
+    })
+  } catch (e) {}
+
+  return runtimeBranches
+}
+
+export async function createBranch(data: { id?: string; name: string; location: string; deviceId?: string }): Promise<Branch> {
   const cleanName = data.name.trim()
   const cleanLocation = data.location.trim()
   const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-")
-  const branchId = `branch-${slug}-${Date.now().toString().slice(-4)}`
-
-  const newBranch: Branch = {
-    id: branchId,
-    name: cleanName,
-    location: cleanLocation,
-    deviceId: data.deviceId?.trim() || `ESP32-${slug.toUpperCase()}`,
-    status: "ONLINE",
-    createdAt: new Date().toISOString(),
-  }
+  const branchId = data.id || `branch-${slug}-${Date.now().toString().slice(-4)}`
 
   await getBranches()
-  runtimeBranches.push(newBranch)
+  const existingIdx = runtimeBranches.findIndex(b => b.id === branchId || b.name.toLowerCase() === cleanName.toLowerCase())
+
+  const newBranch: Branch = {
+    id: existingIdx >= 0 ? runtimeBranches[existingIdx].id : branchId,
+    name: cleanName,
+    location: cleanLocation,
+    deviceId: data.deviceId?.trim() || (existingIdx >= 0 && runtimeBranches[existingIdx].deviceId ? runtimeBranches[existingIdx].deviceId : `ESP32-${slug.toUpperCase()}`),
+    status: "ONLINE",
+    createdAt: existingIdx >= 0 && runtimeBranches[existingIdx].createdAt ? runtimeBranches[existingIdx].createdAt : new Date().toISOString(),
+  }
+
+  if (existingIdx >= 0) {
+    runtimeBranches[existingIdx] = newBranch
+  } else {
+    runtimeBranches.push(newBranch)
+  }
 
   try {
     const { prisma } = await import("@/lib/prisma")
@@ -553,10 +581,36 @@ export type BranchExpense = {
 let runtimeExpenses: BranchExpense[] = []
 
 export async function getExpenses(branchId?: string): Promise<BranchExpense[]> {
-  if (!branchId || branchId === "ALL") {
-    return runtimeExpenses
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const list = await prisma.systemSetting.findMany({
+      where: { key: { startsWith: "exp_" } }
+    })
+    const map = new Map<string, BranchExpense>()
+    for (const item of list) {
+      try {
+        const parsed = JSON.parse(item.value)
+        if (parsed && parsed.id) map.set(parsed.id, parsed)
+      } catch (e) {}
+    }
+    for (const e of runtimeExpenses) {
+      if (!map.has(e.id)) map.set(e.id, e)
+    }
+    const all = Array.from(map.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    runtimeExpenses = all
+
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter((e) => e.branchId === branchId)
+  } catch (e) {
+    if (!branchId || branchId === "ALL") {
+      return runtimeExpenses
+    }
+    return runtimeExpenses.filter((e) => e.branchId === branchId)
   }
-  return runtimeExpenses.filter((e) => e.branchId === branchId)
 }
 
 export async function recordExpense(payload: {
@@ -576,11 +630,27 @@ export async function recordExpense(payload: {
     date: new Date().toISOString(),
   }
   runtimeExpenses.unshift(expense)
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: `exp_${expense.id}` },
+      update: { value: JSON.stringify(expense) },
+      create: { id: `sys-exp-${expense.id}`, key: `exp_${expense.id}`, value: JSON.stringify(expense) }
+    })
+  } catch (e) {}
+
   return expense
 }
 
 export async function deleteBranchExpense(id: string): Promise<boolean> {
   runtimeExpenses = runtimeExpenses.filter((e) => e.id !== id)
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.delete({
+      where: { key: `exp_${id}` }
+    }).catch(() => {})
+  } catch (e) {}
   return true
 }
 
@@ -1068,10 +1138,34 @@ export async function getUserAssignedBranch(userId?: string, userEmail?: string)
 }
 
 export async function getStaffListByBranch(branchId?: string): Promise<BranchStaff[]> {
-  if (!branchId || branchId === "ALL") {
-    return runtimeStaffs
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const list = await prisma.systemSetting.findMany({
+      where: { key: { startsWith: "staff_" } }
+    })
+    const map = new Map<string, BranchStaff>()
+    for (const item of list) {
+      try {
+        const parsed = JSON.parse(item.value)
+        if (parsed && parsed.id) map.set(parsed.id, parsed)
+      } catch (e) {}
+    }
+    for (const s of runtimeStaffs) {
+      if (!map.has(s.id)) map.set(s.id, s)
+    }
+    const all = Array.from(map.values())
+    runtimeStaffs = all
+
+    if (!branchId || branchId === "ALL") {
+      return all
+    }
+    return all.filter(s => s.branchId === branchId)
+  } catch (e) {
+    if (!branchId || branchId === "ALL") {
+      return runtimeStaffs
+    }
+    return runtimeStaffs.filter(s => s.branchId === branchId)
   }
-  return runtimeStaffs.filter(s => s.branchId === branchId)
 }
 
 export async function createStaffForBranch(data: {
@@ -1093,11 +1187,27 @@ export async function createStaffForBranch(data: {
     createdAt: new Date().toISOString(),
   }
   runtimeStaffs.push(newStaff)
+
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.upsert({
+      where: { key: `staff_${newStaff.id}` },
+      update: { value: JSON.stringify(newStaff) },
+      create: { id: `sys-staff-${newStaff.id}`, key: `staff_${newStaff.id}`, value: JSON.stringify(newStaff) }
+    })
+  } catch (e) {}
+
   return newStaff
 }
 
 export async function deleteStaffFromBranch(staffId: string): Promise<boolean> {
   runtimeStaffs = runtimeStaffs.filter(s => s.id !== staffId)
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    await prisma.systemSetting.delete({
+      where: { key: `staff_${staffId}` }
+    }).catch(() => {})
+  } catch (e) {}
   return true
 }
 

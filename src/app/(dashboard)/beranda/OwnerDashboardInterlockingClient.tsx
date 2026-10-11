@@ -100,11 +100,9 @@ export default function OwnerDashboardInterlockingClient({
   const [telegramSentAutomatic, setTelegramSentAutomatic] = useState(false)
 
   const refreshDashboardTransactions = async () => {
-    const branchParam = isAllBranches ? "ALL" : selectedBranchId
-    const synced = await syncTransactions(branchParam)
-    if (synced && synced.length > 0) {
-      setTransactions(synced)
-    }
+    // Sync complete transactions pool so both multi-branch overview cards and individual branch filters remain accurate
+    const synced = await syncTransactions("ALL")
+    setTransactions(synced || [])
   }
 
   useEffect(() => {

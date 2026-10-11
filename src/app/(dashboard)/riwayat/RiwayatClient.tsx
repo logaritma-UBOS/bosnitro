@@ -41,12 +41,8 @@ export default function RiwayatClient() {
 
     // 1. Instant local render (Zero loading delay)
     const localCached = getLocalTransactions(branchParam)
-    if (localCached.length > 0) {
-      setTransactions(localCached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
+    setTransactions(localCached)
+    setLoading(localCached.length === 0)
 
     try {
       // 2. Perform two-way sync with server

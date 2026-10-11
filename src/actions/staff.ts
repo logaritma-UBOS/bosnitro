@@ -15,7 +15,15 @@ export async function getStaffList(branchId?: string) {
       throw new Error("Hanya Pemilik yang bisa mengakses menu ini")
     }
 
-    // Try prisma first if available
+    const staffMap = new Map<string, any>()
+
+    // 1. Load from durable systemSetting / runtime
+    const systemStaffs = await getStaffListByBranch(branchId)
+    for (const s of systemStaffs) {
+      if (s && s.id) staffMap.set(s.id, s)
+    }
+
+    // 2. Load from prisma User table
     try {
       const whereClause = (session.user as any).staffBusinessId ? { id: (session.user as any).staffBusinessId } : { userId: session.user.id }
       const business = await prisma.business.findFirst({ where: whereClause })
@@ -23,23 +31,27 @@ export async function getStaffList(branchId?: string) {
         const dbStaffs = await prisma.user.findMany({
           where: { staffBusinessId: business.id }
         })
-        if (dbStaffs && dbStaffs.length > 0) {
-          return dbStaffs.map(s => ({
-            id: s.id,
-            name: s.name,
-            email: s.email,
-            role: s.role,
-            branchId: s.phone || "branch-utama"
-          })).filter(s => !branchId || branchId === "ALL" || s.branchId === branchId)
+        for (const s of dbStaffs) {
+          const bId = s.phone || "branch-utama"
+          if (!branchId || branchId === "ALL" || bId === branchId) {
+            staffMap.set(s.id, {
+              id: s.id,
+              name: s.name,
+              email: s.email,
+              role: s.role,
+              branchId: bId,
+            })
+          }
         }
       }
     } catch (e) {}
-  } catch (err) {
-    // Continue to fallback
-  }
 
-  // Branch-scoped runtime store fallback (guaranteed reactivity and isolation)
-  return await getStaffListByBranch(branchId)
+    const all = Array.from(staffMap.values())
+    if (!branchId || branchId === "ALL") return all
+    return all.filter(s => s.branchId === branchId)
+  } catch (err) {
+    return await getStaffListByBranch(branchId)
+  }
 }
 
 export async function createStaff(formData: FormData) {

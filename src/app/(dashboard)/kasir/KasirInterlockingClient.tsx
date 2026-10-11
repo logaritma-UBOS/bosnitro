@@ -57,8 +57,15 @@ export default function KasirInterlockingClient({
   initialProducts: InterlockingProduct[]
   user?: { name?: string | null; role?: string | null }
 }) {
-  const { selectedBranch, selectedBranchId } = useBranch()
+  const { selectedBranch, selectedBranchId, isAllBranches, setSelectedBranchId, branches } = useBranch()
   const [products, setProducts] = useState<InterlockingProduct[]>(initialProducts)
+
+  // Enforce specific branch selection in POS (Kasir never operates in ALL mode)
+  useEffect(() => {
+    if (isAllBranches && branches.length > 0) {
+      setSelectedBranchId(branches[0].id)
+    }
+  }, [isAllBranches, branches, setSelectedBranchId])
 
   // Layout & Navigation States matching pos-kasir
   const [activeTab, setActiveTab] = useState<"nitrogen" | "retail">("nitrogen")
@@ -267,8 +274,12 @@ export default function KasirInterlockingClient({
     setIsProcessing(true)
 
     try {
+      const effectiveBranchId = (selectedBranchId && selectedBranchId !== "ALL")
+        ? selectedBranchId
+        : (branches[0]?.id || "branch-utama")
+
       const payload = {
-        branchId: selectedBranchId,
+        branchId: effectiveBranchId,
         items: cart.map((c) => ({
           productId: c.product.id,
           quantity: c.quantity,
@@ -312,7 +323,7 @@ export default function KasirInterlockingClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            branchId: selectedBranchId,
+            branchId: effectiveBranchId,
             durationSeconds: timerSecs,
             vehicleType: vehicleType ? vehicleType.toUpperCase() : "MOTOR",
             serviceVariant: nitrogenItem.product.serviceVariant,
