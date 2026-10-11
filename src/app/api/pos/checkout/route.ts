@@ -23,9 +23,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Data transaksi tidak lengkap" }, { status: 400 })
     }
 
+    const cashierAssignedBranch = (session?.user as any)?.assignedBranchId || (session?.user as any)?.phone || null
+    const finalBranchId = (session?.user?.role !== "OWNER" && cashierAssignedBranch)
+      ? cashierAssignedBranch
+      : branchId
+
     const tx = await recordTransaction({
       businessId,
-      branchId,
+      branchId: finalBranchId,
       cashierId: session?.user?.id || null,
       cashierName: session?.user?.name || (session?.user?.role === "KASIR" ? "Budi Kasir" : "Kasir Outlet"),
       items,

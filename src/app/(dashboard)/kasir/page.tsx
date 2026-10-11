@@ -18,6 +18,7 @@ export default async function KasirPage() {
       user={{
         name: session.user.name,
         role: session.user.role,
+        assignedBranchId: (session.user as any)?.assignedBranchId || (session.user as any)?.phone || null,
       }}
     />
   )

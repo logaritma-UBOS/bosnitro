@@ -6,7 +6,8 @@ import { MapPin, Building2, ChevronDown, Check, Plus } from "lucide-react"
 import AddBranchModal from "@/components/branch/AddBranchModal"
 
 export default function BranchSelector({ allowAll = false }: { allowAll?: boolean }) {
-  const { branches, selectedBranch, selectedBranchId, setSelectedBranchId, isAllBranches } = useBranch()
+  const { branches, selectedBranch, selectedBranchId, setSelectedBranchId, isAllBranches, assignedBranchId, userRole } = useBranch()
+  const isLocked = Boolean(assignedBranchId && userRole !== "OWNER")
   const [isOpen, setIsOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -26,8 +27,14 @@ export default function BranchSelector({ allowAll = false }: { allowAll?: boolea
       <div className="relative" ref={dropdownRef}>
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between gap-2.5 px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 rounded-xl text-left transition-all group"
+          onClick={() => {
+            if (!isLocked) setIsOpen(!isOpen)
+          }}
+          disabled={isLocked}
+          className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-left transition-all ${
+            isLocked ? "cursor-default opacity-90" : "hover:bg-slate-100/80 group cursor-pointer"
+          }`}
+          title={isLocked ? "Cabang outlet kasir dikunci sesuai penugasan" : undefined}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 flex items-center justify-center shrink-0">
@@ -44,14 +51,16 @@ export default function BranchSelector({ allowAll = false }: { allowAll?: boolea
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 truncate">
-                {isAllBranches ? `${branches.length} Outlet Aktif` : selectedBranch.location}
+                {isLocked ? "Cabang Ditugaskan" : (isAllBranches ? `${branches.length} Outlet Aktif` : selectedBranch.location)}
               </p>
             </div>
           </div>
 
-          <ChevronDown
-            className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          />
+          {!isLocked && (
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            />
+          )}
         </button>
 
         {isOpen && (

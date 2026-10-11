@@ -7,6 +7,7 @@ declare module "next-auth" {
       role: string
       staffBusinessId?: string | null
       businessId?: string | null
+      assignedBranchId?: string | null
     } & DefaultSession["user"]
   }
   interface User {
@@ -14,5 +15,6 @@ declare module "next-auth" {
     role: string
     staffBusinessId?: string | null
     businessId?: string | null
+    assignedBranchId?: string | null
   }
 }

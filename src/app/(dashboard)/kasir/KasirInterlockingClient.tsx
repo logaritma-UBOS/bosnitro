@@ -57,18 +57,26 @@ export default function KasirInterlockingClient({
 }: {
   businessId?: string
   initialProducts: InterlockingProduct[]
-  user?: { name?: string | null; role?: string | null }
+  user?: { name?: string | null; role?: string | null; assignedBranchId?: string | null }
 }) {
-  const { selectedBranch, selectedBranchId, isAllBranches, setSelectedBranchId, branches, businessId: contextBusinessId } = useBranch()
+  const { selectedBranch, selectedBranchId, isAllBranches, setSelectedBranchId, branches, businessId: contextBusinessId, assignedBranchId: ctxAssignedBranchId, userRole: ctxUserRole } = useBranch()
   const businessId = propBusinessId || contextBusinessId
+  const assignedBranch = user?.assignedBranchId || ctxAssignedBranchId || null
+  const userRole = user?.role || ctxUserRole || "OWNER"
   const [products, setProducts] = useState<InterlockingProduct[]>(initialProducts)
 
-  // Enforce specific branch selection in POS (Kasir never operates in ALL mode)
+  // Enforce specific branch selection in POS (Kasir never operates in ALL mode, and staff locked to their branch)
   useEffect(() => {
+    if (assignedBranch && userRole !== "OWNER") {
+      if (selectedBranchId !== assignedBranch) {
+        setSelectedBranchId(assignedBranch)
+      }
+      return
+    }
     if (isAllBranches && branches.length > 0) {
       setSelectedBranchId(branches[0].id)
     }
-  }, [isAllBranches, branches, setSelectedBranchId])
+  }, [isAllBranches, branches, setSelectedBranchId, assignedBranch, userRole, selectedBranchId])
 
   // Layout & Navigation States matching pos-kasir
   const [activeTab, setActiveTab] = useState<"nitrogen" | "retail">("nitrogen")
@@ -277,9 +285,11 @@ export default function KasirInterlockingClient({
     setIsProcessing(true)
 
     try {
-      const effectiveBranchId = (selectedBranchId && selectedBranchId !== "ALL")
-        ? selectedBranchId
-        : (branches[0]?.id || "branch-utama")
+      const effectiveBranchId = (assignedBranch && userRole !== "OWNER")
+        ? assignedBranch
+        : ((selectedBranchId && selectedBranchId !== "ALL")
+          ? selectedBranchId
+          : (branches[0]?.id || "branch-utama"))
 
       const payload = {
         businessId,

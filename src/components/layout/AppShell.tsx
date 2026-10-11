@@ -17,9 +17,10 @@ export default async function AppShell({
   const session = await auth()
   const role = session?.user?.role || "OWNER"
   const businessId = await getTenantBusinessId(session)
+  const assignedBranchId = (session?.user as any)?.assignedBranchId || null
 
   return (
-    <BranchProvider businessId={businessId}>
+    <BranchProvider businessId={businessId} assignedBranchId={assignedBranchId} userRole={role}>
       <AppShellClient businessName={businessName} role={role}>
         {children}
       </AppShellClient>

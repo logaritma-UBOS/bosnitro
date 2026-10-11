@@ -7,7 +7,8 @@ import BranchSelector from "@/components/branch/BranchSelector"
 import { Plus, Trash2, Users, ShieldCheck, UserCheck, X, Building2 } from "lucide-react"
 
 export default function PegawaiClient() {
-  const { selectedBranch, selectedBranchId } = useBranch()
+  const { selectedBranch, selectedBranchId, businessId } = useBranch()
+  const STAFF_CACHE_KEY = businessId ? `bosnitro_staff_list_${businessId}` : "bosnitro_staff_list"
   const [staffs, setStaffs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -15,10 +16,64 @@ export default function PegawaiClient() {
   const [submitLoading, setSubmitLoading] = useState(false)
 
   const loadStaffs = async () => {
-    setLoading(true)
+    // 1. Instant cache load
+    let localFiltered: any[] = []
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STAFF_CACHE_KEY)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            localFiltered = parsed.filter(
+              (s: any) => !selectedBranchId || selectedBranchId === "ALL" || s.branchId === selectedBranchId
+            )
+            if (localFiltered.length > 0) {
+              setStaffs(localFiltered)
+              setLoading(false)
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
     try {
       const data = await getStaffList(selectedBranchId)
-      setStaffs(data || [])
+      if (Array.isArray(data)) {
+        // Deduplicate by email
+        const staffMap = new Map<string, any>()
+        for (const s of data) {
+          if (s && s.email) staffMap.set(s.email.toLowerCase().trim(), s)
+        }
+        // If local had staff for this branch that server missed (container restart), merge them
+        for (const ls of localFiltered) {
+          if (ls && ls.email && !staffMap.has(ls.email.toLowerCase().trim())) {
+            staffMap.set(ls.email.toLowerCase().trim(), ls)
+          }
+        }
+
+        const merged = Array.from(staffMap.values())
+        setStaffs(merged)
+
+        // Persist to local cache
+        if (typeof window !== "undefined") {
+          try {
+            const allCachedRaw = localStorage.getItem(STAFF_CACHE_KEY)
+            const allMap = new Map<string, any>()
+            if (allCachedRaw) {
+              const allParsed = JSON.parse(allCachedRaw)
+              if (Array.isArray(allParsed)) {
+                for (const s of allParsed) {
+                  if (s && s.email) allMap.set(s.email.toLowerCase().trim(), s)
+                }
+              }
+            }
+            for (const s of merged) {
+              if (s && s.email) allMap.set(s.email.toLowerCase().trim(), s)
+            }
+            localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(Array.from(allMap.values())))
+          } catch (e) {}
+        }
+      }
     } catch (e: any) {
       console.error(e)
     } finally {
@@ -36,6 +91,30 @@ export default function PegawaiClient() {
     setError("")
     const formData = new FormData(e.currentTarget)
     formData.set("branchId", selectedBranchId)
+
+    const optimisticStaff = {
+      id: `staff-${Date.now()}`,
+      name: (formData.get("name") as string)?.trim(),
+      email: (formData.get("email") as string)?.trim().toLowerCase(),
+      role: formData.get("role") as string,
+      branchId: selectedBranchId,
+      branchName: selectedBranch.name,
+      createdAt: new Date().toISOString(),
+    }
+
+    // Save to local cache immediately
+    if (typeof window !== "undefined") {
+      try {
+        const cachedRaw = localStorage.getItem(STAFF_CACHE_KEY)
+        const allList = cachedRaw ? JSON.parse(cachedRaw) : []
+        const updatedList = Array.isArray(allList)
+          ? allList.filter((s: any) => s.email?.toLowerCase().trim() !== optimisticStaff.email)
+          : []
+        updatedList.push(optimisticStaff)
+        localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(updatedList))
+      } catch (e) {}
+    }
+
     try {
       await createStaff(formData)
       setShowModal(false)
@@ -49,6 +128,21 @@ export default function PegawaiClient() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus pegawai ini?")) return
+
+    // Optimistically remove from local cache
+    if (typeof window !== "undefined") {
+      try {
+        const cachedRaw = localStorage.getItem(STAFF_CACHE_KEY)
+        if (cachedRaw) {
+          const allList = JSON.parse(cachedRaw)
+          if (Array.isArray(allList)) {
+            const next = allList.filter((s: any) => s.id !== id && s.email !== id)
+            localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify(next))
+          }
+        }
+      } catch (e) {}
+    }
+
     try {
       await deleteStaff(id)
       loadStaffs()

@@ -16,11 +16,23 @@ type BranchContextType = {
   updateBranchState: (updated: Branch) => void
   deleteBranchState: (id: string) => void
   refreshBranches: () => Promise<void>
+  assignedBranchId?: string | null
+  userRole?: string
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined)
 
-export function BranchProvider({ children, businessId }: { children: React.ReactNode; businessId?: string }) {
+export function BranchProvider({
+  children,
+  businessId,
+  assignedBranchId,
+  userRole = "OWNER",
+}: {
+  children: React.ReactNode
+  businessId?: string
+  assignedBranchId?: string | null
+  userRole?: string
+}) {
   const STORAGE_KEY = businessId ? `ubos_selected_branch_id_${businessId}` : "ubos_selected_branch_id"
   const BRANCHES_STORAGE_KEY = businessId ? `bosnitro_branches_list_${businessId}` : "bosnitro_branches_list"
   const BRANCH_EVENT_NAME = businessId ? `bosnitro_branches_sync_${businessId}` : "bosnitro_branches_sync"
@@ -94,6 +106,9 @@ export function BranchProvider({ children, businessId }: { children: React.React
   })
 
   const [selectedBranchId, setSelectedBranchIdState] = useState<string>(() => {
+    if (assignedBranchId && userRole !== "OWNER") {
+      return assignedBranchId
+    }
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(STORAGE_KEY)
@@ -104,6 +119,9 @@ export function BranchProvider({ children, businessId }: { children: React.React
   })
 
   const [isAllBranches, setIsAllBranches] = useState<boolean>(() => {
+    if (assignedBranchId && userRole !== "OWNER") {
+      return false
+    }
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(STORAGE_KEY)
@@ -214,6 +232,11 @@ export function BranchProvider({ children, businessId }: { children: React.React
   }, [refreshBranches, BRANCHES_STORAGE_KEY, STORAGE_KEY, BRANCH_EVENT_NAME, businessId])
 
   useEffect(() => {
+    if (assignedBranchId && userRole !== "OWNER") {
+      setSelectedBranchIdState(assignedBranchId)
+      setIsAllBranches(false)
+      return
+    }
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved && (saved === "ALL" || branches.some(b => b.id === saved))) {
@@ -228,9 +251,14 @@ export function BranchProvider({ children, businessId }: { children: React.React
         setSelectedBranchIdState(branches[0].id)
       }
     } catch (e) {}
-  }, [branches, selectedBranchId, STORAGE_KEY])
+  }, [branches, selectedBranchId, STORAGE_KEY, assignedBranchId, userRole])
 
   const setSelectedBranchId = (id: string) => {
+    if (assignedBranchId && userRole !== "OWNER") {
+      setSelectedBranchIdState(assignedBranchId)
+      setIsAllBranches(false)
+      return
+    }
     if (id === "ALL") {
       setIsAllBranches(true)
       try {
@@ -243,6 +271,14 @@ export function BranchProvider({ children, businessId }: { children: React.React
         localStorage.setItem(STORAGE_KEY, id)
       } catch (e) {}
     }
+  }
+
+  const handleSetIsAllBranches = (val: boolean) => {
+    if (assignedBranchId && userRole !== "OWNER") {
+      setIsAllBranches(false)
+      return
+    }
+    setIsAllBranches(val)
   }
 
   const addBranch = (newBranch: Branch) => {
@@ -293,7 +329,13 @@ export function BranchProvider({ children, businessId }: { children: React.React
     })
   }
 
-  const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0] || ({
+  const selectedBranch = branches.find(b => b.id === selectedBranchId) || (assignedBranchId ? {
+    id: assignedBranchId,
+    businessId,
+    name: "Cabang Outlet",
+    location: "-",
+    status: "ONLINE",
+  } as Branch : null) || branches[0] || ({
     id: businessId ? `${businessId}-utama` : "branch-utama",
     businessId,
     name: "Cabang Utama",
@@ -310,11 +352,13 @@ export function BranchProvider({ children, businessId }: { children: React.React
         selectedBranchId,
         setSelectedBranchId,
         isAllBranches,
-        setIsAllBranches,
+        setIsAllBranches: handleSetIsAllBranches,
         addBranch,
         updateBranchState,
         deleteBranchState,
         refreshBranches,
+        assignedBranchId,
+        userRole,
       }}
     >
       {children}

@@ -67,7 +67,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email, 
           name: user.name, 
           role: user.role, 
-          staffBusinessId: user.staffBusinessId 
+          staffBusinessId: user.staffBusinessId,
+          assignedBranchId: user.phone || null,
         }
       }
     })
@@ -126,6 +127,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.email = user.email
         token.role = user.role
         token.staffBusinessId = (user as any).staffBusinessId || null
+        token.assignedBranchId = (user as any).assignedBranchId || (user as any).phone || null
         
         let businessId = token.staffBusinessId || (user as any).businessId || null
         if (!businessId) {
@@ -137,6 +139,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             token.role = dbUser.role
             token.staffBusinessId = dbUser.staffBusinessId
             businessId = dbUser.staffBusinessId || dbUser.businesses[0]?.id || dbUser.id
+            if (!token.assignedBranchId && dbUser.phone) {
+              token.assignedBranchId = dbUser.phone
+            }
           }
         }
         token.businessId = businessId || user.id
@@ -145,8 +150,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.loginDateStr = currentDayStr;
       }
 
-      // Guarantee businessId is always canonically resolved even if session was established previously
-      if (token.id && (!token.businessId || token.businessId === token.id)) {
+      // Guarantee businessId & assignedBranchId are always canonically resolved even if session was established previously
+      if (token.id && (!token.businessId || token.businessId === token.id || (!token.assignedBranchId && token.role !== "OWNER"))) {
         try {
           const dbUser = await prisma.user.findUnique({ 
             where: { id: token.id as string },
@@ -156,6 +161,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             token.role = dbUser.role
             token.staffBusinessId = dbUser.staffBusinessId
             token.businessId = dbUser.staffBusinessId || dbUser.businesses[0]?.id || dbUser.id
+            if (dbUser.phone) {
+              token.assignedBranchId = dbUser.phone
+            }
           }
         } catch (e) {}
       }
@@ -176,6 +184,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.role = token.role as string
         session.user.staffBusinessId = token.staffBusinessId as string | null
         session.user.businessId = (token.businessId as string) || (token.staffBusinessId as string) || (token.id as string)
+        session.user.assignedBranchId = (token.assignedBranchId as string) || null
       }
       return session
     },
