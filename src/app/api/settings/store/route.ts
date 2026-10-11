@@ -48,9 +48,9 @@ export async function GET() {
 
     const storeName = sysMap[`${scopeId}_store_name`] || business?.name || (isMeruvinLegacy ? (sysMap["store_name"] || "MERUVIN") : "Toko Saya")
     const profileImage = user?.image || sysMap[`${scopeId}_store_profile_image`] || (isMeruvinLegacy ? sysMap["store_profile_image"] : null)
-    const telegramPhone = sysMap[`${scopeId}_store_telegram_phone`] || user?.phone?.trim() || (isMeruvinLegacy ? (sysMap["store_telegram_phone"] || "083153598697") : (user?.phone?.trim() || ""))
-    const telegramChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || (isMeruvinLegacy ? (sysMap["store_telegram_chat_id"] || "-5332437584") : null)
-    const telegramBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || (isMeruvinLegacy ? (sysMap["store_telegram_bot_token"] || process.env.TELEGRAM_BOT_TOKEN) : null) || null
+    const telegramPhone = sysMap[`${scopeId}_store_telegram_phone`] || sysMap["store_telegram_phone"] || user?.phone?.trim() || runtime.telegramPhone || (isMeruvinLegacy ? "083153598697" : "")
+    const telegramChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || sysMap["store_telegram_chat_id"] || runtime.telegramChatId || (isMeruvinLegacy ? "-5332437584" : null)
+    const telegramBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || sysMap["store_telegram_bot_token"] || runtime.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || null
 
     if (telegramPhone) {
       setActiveTelegramRecipient(telegramPhone)
@@ -86,16 +86,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { storeName, profileImage, telegramPhone, telegramChatId, telegramBotToken } = body
 
-    if (!storeName || !storeName.trim()) {
-      return NextResponse.json({ error: "Nama toko wajib diisi" }, { status: 400 })
-    }
-
-    const cleanStoreName = storeName.trim()
+    // 1. Update User (phone & image) strictly for THIS logged-in user
     const cleanTelegramPhone = (telegramPhone || "").trim()
     const cleanTelegramChatId = (telegramChatId || "").trim() || null
     const cleanTelegramBotToken = (telegramBotToken || "").trim() || null
 
-    // 1. Update User (phone & image) strictly for THIS logged-in user
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -104,7 +99,7 @@ export async function POST(req: NextRequest) {
       }
     }).catch(e => console.warn("Failed updating user in prisma:", e))
 
-    // 2. Update Business (name) strictly for THIS user's business
+    // 2. Determine Business strictly for THIS user's business
     const whereClause = (session.user as any).staffBusinessId 
       ? { id: (session.user as any).staffBusinessId } 
       : { userId: session.user.id }
@@ -112,7 +107,13 @@ export async function POST(req: NextRequest) {
     const business = await prisma.business.findFirst({ where: whereClause })
     const scopeId = business?.id || session.user.id
 
-    if (business) {
+    let cleanStoreName = (storeName || "").trim()
+    if (!cleanStoreName) {
+      const existingSettings = await getStoreSettings(scopeId)
+      cleanStoreName = existingSettings.storeName || business?.name || "BOSNITRO"
+    }
+
+    if (business && storeName && storeName.trim()) {
       await prisma.business.update({
         where: { id: business.id },
         data: { name: cleanStoreName }

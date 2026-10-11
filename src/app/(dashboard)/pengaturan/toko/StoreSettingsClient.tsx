@@ -37,6 +37,8 @@ import {
   Check,
   Cloud,
   Key,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -67,7 +69,23 @@ export default function StoreSettingsClient({
   const [storeName, setStoreName] = useState(initialSettings.storeName)
   const [telegramPhone, setTelegramPhone] = useState(initialSettings.telegramPhone)
   const [telegramChatId, setTelegramChatId] = useState(initialSettings.telegramChatId || "")
-  const [telegramBotToken, setTelegramBotToken] = useState(initialSettings.telegramBotToken || "")
+  const [telegramBotToken, setTelegramBotToken] = useState(() => {
+    if (initialSettings.telegramBotToken) return initialSettings.telegramBotToken
+    if (typeof window !== "undefined") {
+      const dedicated = localStorage.getItem("bosnitro_telegram_bot_token")
+      if (dedicated) return dedicated
+      const userKey = initialSettings.userId || initialSettings.userEmail || "default"
+      const saved = localStorage.getItem(`ubos_store_settings_${userKey}`) || localStorage.getItem("ubos_store_settings")
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed.telegramBotToken) return parsed.telegramBotToken
+        } catch (e) {}
+      }
+    }
+    return ""
+  })
+  const [showBotToken, setShowBotToken] = useState(false)
   const [profileImage, setProfileImage] = useState<string | null>(initialSettings.profileImage)
 
   const [saving, setSaving] = useState(false)
@@ -78,13 +96,31 @@ export default function StoreSettingsClient({
   useEffect(() => {
     try {
       const userKey = initialSettings.userId || initialSettings.userEmail || "default"
-      const saved = localStorage.getItem(`ubos_store_settings_${userKey}`) || (userKey === "default" ? localStorage.getItem("ubos_store_settings") : null)
+      const dedicated = localStorage.getItem("bosnitro_telegram_bot_token")
+      const saved = localStorage.getItem(`ubos_store_settings_${userKey}`) || localStorage.getItem("ubos_store_settings")
+      let localBotToken = dedicated || ""
       if (saved) {
         const parsed = JSON.parse(saved)
         if (parsed.storeName && !initialSettings.storeName) setStoreName(parsed.storeName)
         if (parsed.telegramPhone && !initialSettings.telegramPhone) setTelegramPhone(parsed.telegramPhone)
         if (parsed.telegramChatId && !initialSettings.telegramChatId) setTelegramChatId(parsed.telegramChatId)
-        if (parsed.telegramBotToken && !initialSettings.telegramBotToken) setTelegramBotToken(parsed.telegramBotToken)
+        if (parsed.telegramBotToken && !localBotToken) localBotToken = parsed.telegramBotToken
+      }
+      const effectiveToken = initialSettings.telegramBotToken || localBotToken
+      if (effectiveToken) {
+        setTelegramBotToken(effectiveToken)
+        localStorage.setItem("bosnitro_telegram_bot_token", effectiveToken)
+
+        if (!initialSettings.telegramBotToken && localBotToken) {
+          fetch("/api/settings/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              storeName: initialSettings.storeName || "BOSNITRO",
+              telegramBotToken: localBotToken,
+            }),
+          }).catch(() => {})
+        }
       }
     } catch (e) {}
   }, [initialSettings])
@@ -221,19 +257,21 @@ export default function StoreSettingsClient({
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Gagal menyimpan")
 
-      // Persist in localStorage for instant synchronization scoped by account
+      // Persist in localStorage for instant synchronization scoped by account and dedicated token key
       try {
         const userKey = initialSettings.userId || initialSettings.userEmail || "default"
-        localStorage.setItem(
-          `ubos_store_settings_${userKey}`,
-          JSON.stringify({
-            storeName: storeName.trim(),
-            profileImage,
-            telegramPhone: telegramPhone.trim(),
-            telegramChatId: telegramChatId.trim(),
-            telegramBotToken: telegramBotToken.trim(),
-          })
-        )
+        if (telegramBotToken.trim()) {
+          localStorage.setItem("bosnitro_telegram_bot_token", telegramBotToken.trim())
+        }
+        const settingsPayload = {
+          storeName: storeName.trim(),
+          profileImage,
+          telegramPhone: telegramPhone.trim(),
+          telegramChatId: telegramChatId.trim(),
+          telegramBotToken: telegramBotToken.trim(),
+        }
+        localStorage.setItem(`ubos_store_settings_${userKey}`, JSON.stringify(settingsPayload))
+        localStorage.setItem("ubos_store_settings", JSON.stringify(settingsPayload))
       } catch (e) {}
 
       setSaveSuccess(true)
@@ -579,12 +617,20 @@ export default function StoreSettingsClient({
                 <div className="relative">
                   <Key className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                   <input
-                    type="password"
+                    type={showBotToken ? "text" : "password"}
                     value={telegramBotToken}
                     onChange={(e) => setTelegramBotToken(e.target.value)}
                     placeholder="Contoh: 7123456789:AAHxxxxx..."
-                    className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl font-mono"
+                    className="w-full pl-9 pr-10 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl font-mono"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowBotToken(!showBotToken)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                    title={showBotToken ? "Sembunyikan Token" : "Tampilkan Token"}
+                  >
+                    {showBotToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
                   Masukkan token dari <strong>@BotFather</strong> dan pastikan bot telah diundang ke grup Telegram toko (<strong>{telegramChatId || "-5332437584"}</strong>) agar laporan terkirim 100% otomatis.

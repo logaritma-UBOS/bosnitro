@@ -65,11 +65,11 @@ export async function getStoreSettings(scopeId?: string): Promise<{
     if (scopeId && map[`${scopeId}_store_telegram_phone`]) item.telegramPhone = map[`${scopeId}_store_telegram_phone`]
     else if (!scopeId && map["store_telegram_phone"]) item.telegramPhone = map["store_telegram_phone"]
 
-    if (scopeId && map[`${scopeId}_store_telegram_chat_id`]) item.telegramChatId = map[`${scopeId}_store_telegram_chat_id`]
-    else if (!scopeId && map["store_telegram_chat_id"]) item.telegramChatId = map["store_telegram_chat_id"]
+    const foundChatId = (scopeId && map[`${scopeId}_store_telegram_chat_id`]) || map["store_telegram_chat_id"] || DEFAULT_STORE_SETTINGS.telegramChatId || process.env.TELEGRAM_CHAT_ID
+    if (foundChatId) item.telegramChatId = foundChatId
 
-    if (scopeId && map[`${scopeId}_store_telegram_bot_token`]) item.telegramBotToken = map[`${scopeId}_store_telegram_bot_token`]
-    else if (!scopeId && map["store_telegram_bot_token"]) item.telegramBotToken = map["store_telegram_bot_token"]
+    const foundToken = (scopeId && map[`${scopeId}_store_telegram_bot_token`]) || map["store_telegram_bot_token"] || DEFAULT_STORE_SETTINGS.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN
+    if (foundToken) item.telegramBotToken = foundToken
 
     if (scopeId && map[`${scopeId}_store_profile_image`]) item.profileImage = map[`${scopeId}_store_profile_image`]
     else if (!scopeId && map["store_profile_image"]) item.profileImage = map["store_profile_image"]
@@ -97,10 +97,16 @@ export async function updateStoreSettings(
   if (data.storeName !== undefined && data.storeName.trim()) item.storeName = data.storeName.trim()
   if (data.profileImage !== undefined) item.profileImage = data.profileImage
   if (data.telegramPhone !== undefined && data.telegramPhone.trim()) item.telegramPhone = data.telegramPhone.trim()
-  if (data.telegramChatId !== undefined) item.telegramChatId = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : null
-  if (data.telegramBotToken !== undefined) item.telegramBotToken = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : null
+  if (data.telegramChatId !== undefined && data.telegramChatId && data.telegramChatId.trim()) {
+    item.telegramChatId = data.telegramChatId.trim()
+    DEFAULT_STORE_SETTINGS.telegramChatId = data.telegramChatId.trim()
+  }
+  if (data.telegramBotToken !== undefined && data.telegramBotToken && data.telegramBotToken.trim()) {
+    item.telegramBotToken = data.telegramBotToken.trim()
+    DEFAULT_STORE_SETTINGS.telegramBotToken = data.telegramBotToken.trim()
+  }
 
-  // Persist directly to Prisma SystemSetting (scoped per account/business)
+  // Persist directly to Prisma SystemSetting (scoped per account/business and global fallback)
   try {
     const { prisma } = await import("@/lib/prisma")
     const storeNameKey = scopeId ? `${scopeId}_store_name` : "store_name"
@@ -115,6 +121,11 @@ export async function updateStoreSettings(
         update: { value: data.storeName.trim() },
         create: { id: `sys-${storeNameKey}`, key: storeNameKey, value: data.storeName.trim() }
       })
+      await prisma.systemSetting.upsert({
+        where: { key: "store_name" },
+        update: { value: data.storeName.trim() },
+        create: { id: "sys-store_name", key: "store_name", value: data.storeName.trim() }
+      }).catch(() => {})
     }
     if (data.telegramPhone && data.telegramPhone.trim()) {
       await prisma.systemSetting.upsert({
@@ -122,22 +133,37 @@ export async function updateStoreSettings(
         update: { value: data.telegramPhone.trim() },
         create: { id: `sys-${phoneKey}`, key: phoneKey, value: data.telegramPhone.trim() }
       })
+      await prisma.systemSetting.upsert({
+        where: { key: "store_telegram_phone" },
+        update: { value: data.telegramPhone.trim() },
+        create: { id: "sys-store_telegram_phone", key: "store_telegram_phone", value: data.telegramPhone.trim() }
+      }).catch(() => {})
     }
-    if (data.telegramChatId !== undefined) {
-      const val = data.telegramChatId && data.telegramChatId.trim() ? data.telegramChatId.trim() : ""
+    if (data.telegramChatId !== undefined && data.telegramChatId && data.telegramChatId.trim()) {
+      const val = data.telegramChatId.trim()
       await prisma.systemSetting.upsert({
         where: { key: chatIdKey },
         update: { value: val },
         create: { id: `sys-${chatIdKey}`, key: chatIdKey, value: val }
       })
+      await prisma.systemSetting.upsert({
+        where: { key: "store_telegram_chat_id" },
+        update: { value: val },
+        create: { id: "sys-store_telegram_chat_id", key: "store_telegram_chat_id", value: val }
+      }).catch(() => {})
     }
-    if (data.telegramBotToken !== undefined) {
-      const val = data.telegramBotToken && data.telegramBotToken.trim() ? data.telegramBotToken.trim() : ""
+    if (data.telegramBotToken !== undefined && data.telegramBotToken && data.telegramBotToken.trim()) {
+      const val = data.telegramBotToken.trim()
       await prisma.systemSetting.upsert({
         where: { key: botTokenKey },
         update: { value: val },
         create: { id: `sys-${botTokenKey}`, key: botTokenKey, value: val }
       })
+      await prisma.systemSetting.upsert({
+        where: { key: "store_telegram_bot_token" },
+        update: { value: val },
+        create: { id: "sys-store_telegram_bot_token", key: "store_telegram_bot_token", value: val }
+      }).catch(() => {})
     }
     if (data.profileImage !== undefined && data.profileImage) {
       await prisma.systemSetting.upsert({

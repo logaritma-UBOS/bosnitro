@@ -83,7 +83,20 @@ export default function OwnerDashboardInterlockingClient({
   // Dynamic Telegram info
   const [telegramPhone, setTelegramPhone] = useState(initialTelegramPhone || "083153598697")
   const [telegramChatId, setTelegramChatId] = useState<string | null>("-5332437584")
-  const [telegramBotToken, setTelegramBotToken] = useState<string | null>(null)
+  const [telegramBotToken, setTelegramBotToken] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const dedicated = localStorage.getItem("bosnitro_telegram_bot_token")
+      if (dedicated) return dedicated
+      const saved = localStorage.getItem("ubos_store_settings")
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed.telegramBotToken) return parsed.telegramBotToken
+        } catch (e) {}
+      }
+    }
+    return null
+  })
   const [telegramSentAutomatic, setTelegramSentAutomatic] = useState(false)
 
   const refreshDashboardTransactions = async () => {
@@ -97,20 +110,65 @@ export default function OwnerDashboardInterlockingClient({
   useEffect(() => {
     refreshDashboardTransactions()
 
+    // Immediate check from localStorage
+    let localBotToken: string | null = null
+    try {
+      localBotToken = localStorage.getItem("bosnitro_telegram_bot_token")
+      if (!localBotToken) {
+        const saved = localStorage.getItem("ubos_store_settings")
+        if (saved) {
+          const p = JSON.parse(saved)
+          if (p.telegramBotToken) localBotToken = p.telegramBotToken
+        }
+      }
+      if (localBotToken) {
+        setTelegramBotToken(localBotToken)
+      }
+    } catch (e) {}
+
     fetch("/api/settings/store")
       .then((res) => res.json())
       .then((data) => {
         if (data.telegramPhone) setTelegramPhone(data.telegramPhone)
         if (data.telegramChatId) setTelegramChatId(data.telegramChatId)
-        if (data.telegramBotToken) setTelegramBotToken(data.telegramBotToken)
+        
+        const effectiveToken = data.telegramBotToken || localBotToken || null
+        if (effectiveToken) {
+          setTelegramBotToken(effectiveToken)
+          try {
+            localStorage.setItem("bosnitro_telegram_bot_token", effectiveToken)
+          } catch (e) {}
+        }
+
+        // If client has token but server returned null (e.g. serverless cold container restart), auto-heal server
+        if (localBotToken && !data.telegramBotToken) {
+          fetch("/api/settings/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              storeName: data.storeName || "BOSNITRO",
+              telegramBotToken: localBotToken,
+            }),
+          }).catch(() => {})
+        }
+
         try {
           const userKey = data.userId || data.userEmail || "default"
-          localStorage.setItem(`ubos_store_settings_${userKey}`, JSON.stringify({
-            storeName: data.storeName,
-            telegramPhone: data.telegramPhone,
-            telegramChatId: data.telegramChatId,
-            telegramBotToken: data.telegramBotToken,
-          }))
+          const existingSaved = localStorage.getItem(`ubos_store_settings_${userKey}`)
+          let prevParsed: any = {}
+          if (existingSaved) {
+            try { prevParsed = JSON.parse(existingSaved) } catch (e) {}
+          }
+          const finalToken = effectiveToken || prevParsed.telegramBotToken || null
+
+          const payload = {
+            storeName: data.storeName || prevParsed.storeName,
+            telegramPhone: data.telegramPhone || prevParsed.telegramPhone,
+            telegramChatId: data.telegramChatId || prevParsed.telegramChatId,
+            telegramBotToken: finalToken,
+          }
+          localStorage.setItem(`ubos_store_settings_${userKey}`, JSON.stringify(payload))
+          localStorage.setItem("ubos_store_settings", JSON.stringify(payload))
         } catch (e) {}
       })
       .catch(() => {})
@@ -158,7 +216,12 @@ export default function OwnerDashboardInterlockingClient({
     let effectivePhone = telegramPhone
     let effectiveChatId = telegramChatId
     let effectiveBotToken = telegramBotToken
+
     try {
+      const dedicatedToken = localStorage.getItem("bosnitro_telegram_bot_token")
+      if (dedicatedToken) {
+        effectiveBotToken = dedicatedToken
+      }
       const saved = localStorage.getItem("ubos_store_settings")
       if (saved) {
         const parsed = JSON.parse(saved)
