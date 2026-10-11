@@ -231,7 +231,7 @@ export default function OwnerDashboardInterlockingClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          branchId: selectedBranchId,
+          branchId: isAllBranches ? "ALL" : selectedBranchId,
           recipient: effectivePhone || "083153598697",
           chatId: effectiveChatId || undefined,
           botToken: effectiveBotToken || undefined,

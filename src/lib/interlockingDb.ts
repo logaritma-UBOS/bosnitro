@@ -1,4 +1,4 @@
-import { Branch, InterlockingProduct, InterlockingTransaction, FraudAlert, ShiftClosing, DEFAULT_BRANCHES } from "@/types/branch"
+import { Branch, InterlockingProduct, InterlockingTransaction, FraudAlert, ShiftClosing, DEFAULT_BRANCHES, SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN } from "@/types/branch"
 import { supabase } from "@/lib/supabaseClient"
 import { sendTelegramAlert } from "@/lib/telegram"
 import { upsertCustomer } from "@/lib/crmDb"
@@ -21,7 +21,7 @@ const DEFAULT_STORE_SETTINGS = {
   profileImage: null as string | null,
   telegramPhone: "",
   telegramChatId: null as string | null,
-  telegramBotToken: null as string | null,
+  telegramBotToken: SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN as string | null,
 }
 
 export async function getStoreSettings(scopeId?: string): Promise<{
@@ -76,13 +76,13 @@ export async function getStoreSettings(scopeId?: string): Promise<{
 
       item.telegramPhone = map[`${scopeId}_store_telegram_phone`] || ""
       item.telegramChatId = map[`${scopeId}_store_telegram_chat_id`] || null
-      item.telegramBotToken = map[`${scopeId}_store_telegram_bot_token`] || null
+      item.telegramBotToken = map[`${scopeId}_store_telegram_bot_token`] || SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN
       item.profileImage = map[`${scopeId}_store_profile_image`] || null
     } else {
       if (map["store_name"]) item.storeName = map["store_name"]
       if (map["store_telegram_phone"]) item.telegramPhone = map["store_telegram_phone"]
       item.telegramChatId = map["store_telegram_chat_id"] || null
-      item.telegramBotToken = map["store_telegram_bot_token"] || null
+      item.telegramBotToken = map["store_telegram_bot_token"] || SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN
       if (map["store_profile_image"]) item.profileImage = map["store_profile_image"]
     }
   } catch (e) {}
@@ -1169,7 +1169,7 @@ export async function recordFraudAlert(payload: {
     `⏰ <b>Waktu:</b> ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
     `${footerNote}`
 
-  await sendTelegramAlert(tgMsg)
+  await sendTelegramAlert(tgMsg, payload.businessId)
 
   return alert
 }

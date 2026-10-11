@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { sendDailyBranchReportTelegram, generateDailyBranchReportText, getActiveTelegramRecipient, getActiveTelegramChatId } from "@/lib/telegram"
+import { sendDailyBranchReportTelegram, generateDailyBranchReportText, getActiveTelegramRecipient, getActiveTelegramChatId, SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN } from "@/lib/telegram"
 import { auth } from "@/auth"
 
 export async function POST(req: NextRequest) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
         targetChatId = sysMap[`${scopeId}_store_telegram_chat_id`] || (isMeruvinLegacy ? (sysMap["store_telegram_chat_id"] || getActiveTelegramChatId() || undefined) : undefined)
       }
       if (!targetBotToken) {
-        targetBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || (isMeruvinLegacy ? (sysMap["store_telegram_bot_token"] || process.env.TELEGRAM_BOT_TOKEN) : undefined)
+        targetBotToken = sysMap[`${scopeId}_store_telegram_bot_token`] || sysMap["store_telegram_bot_token"] || process.env.TELEGRAM_BOT_TOKEN || SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN
       }
     }
 

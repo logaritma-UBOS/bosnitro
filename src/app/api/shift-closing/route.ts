@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
         `⏰ <b>Waktu:</b> ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
         `<i>Peringatan audit otomatis oleh BOSNITRO Anti-Loss System.</i>`
 
-      sendTelegramAlert(alertMsg).catch(console.error)
+      sendTelegramAlert(alertMsg, businessId).catch(console.error)
 
       // Automatically register in Fraud Alert list for executive monitoring
       recordFraudAlert({

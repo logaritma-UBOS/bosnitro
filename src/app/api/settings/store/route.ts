@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { updateStoreSettings, getStoreSettings } from "@/lib/interlockingDb"
-import { setActiveTelegramRecipient, setActiveTelegramChatId, DEFAULT_TELEGRAM_RECIPIENT } from "@/lib/telegram"
+import { setActiveTelegramRecipient, setActiveTelegramChatId, DEFAULT_TELEGRAM_RECIPIENT, SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN } from "@/lib/telegram"
 
 export async function GET() {
   try {
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     // 1. Update User (phone & image) strictly for THIS logged-in user
     const cleanTelegramPhone = (telegramPhone || "").trim()
     const cleanTelegramChatId = (telegramChatId || "").trim() || null
-    const cleanTelegramBotToken = (telegramBotToken || "").trim() || null
+    const cleanTelegramBotToken = (telegramBotToken || "").trim() || SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN
 
     await prisma.user.update({
       where: { id: session.user.id },

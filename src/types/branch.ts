@@ -13,6 +13,9 @@ export const DEFAULT_BRANCHES: Branch[] = [
   { id: "branch-utama", name: "Cabang Utama", location: "Jl. Utama No. 1", deviceId: "ESP32-UTAMA", status: "ONLINE" },
 ]
 
+export const SYSTEM_DEFAULT_TELEGRAM_BOT_TOKEN = "8643536180:AAGXpku7juz7AqqDNlWn1JKPIFkttPap5iA"
+export const SYSTEM_DEFAULT_BOT_USERNAME = "uboslogaritma_bot"
+
 export type StoreProfileSettings = {
   storeName: string
   profileImage: string | null

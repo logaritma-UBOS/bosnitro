@@ -39,6 +39,8 @@ import {
   Key,
   Eye,
   EyeOff,
+  Bot,
+  ChevronDown,
 } from "lucide-react"
 
 export default function StoreSettingsClient({
@@ -86,6 +88,7 @@ export default function StoreSettingsClient({
     return ""
   })
   const [showBotToken, setShowBotToken] = useState(false)
+  const [showCustomToken, setShowCustomToken] = useState(false)
   const [profileImage, setProfileImage] = useState<string | null>(initialSettings.profileImage)
 
   const [saving, setSaving] = useState(false)
@@ -607,34 +610,67 @@ export default function StoreSettingsClient({
                 </div>
               </div>
 
+              {/* Bot Telegram Resmi Badge */}
               <div className="pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Token Bot Telegram (Opsional untuk Kirim Otomatis)
-                  </label>
-                  <span className="text-[10px] text-slate-400">Dari @BotFather</span>
+                <div className="p-4 bg-emerald-50/90 border border-emerald-200/90 rounded-2xl flex items-start gap-3 shadow-xs">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold text-emerald-950">Bot Telegram Resmi:</span>
+                      <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg font-mono">
+                        @uboslogaritma_bot
+                      </span>
+                      <span className="text-[10px] bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        Aktif Otomatis
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-900 leading-relaxed">
+                      Anda <strong>tidak perlu membuat bot atau memasukkan token sendiri</strong>. Cukup masukkan <b>ID Chat / Grup Telegram Toko</b> Anda di atas, dan undang bot <strong>@uboslogaritma_bot</strong> ke dalam grup Telegram toko Anda agar laporan transaksi, audit, dan anomali IoT terkirim 100% otomatis.
+                    </p>
+                  </div>
                 </div>
-                <div className="relative">
-                  <Key className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                  <input
-                    type={showBotToken ? "text" : "password"}
-                    value={telegramBotToken}
-                    onChange={(e) => setTelegramBotToken(e.target.value)}
-                    placeholder="Contoh: 7123456789:AAHxxxxx..."
-                    className="w-full pl-9 pr-10 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl font-mono"
-                  />
+
+                {/* Optional Custom Token Toggle */}
+                <div className="mt-2.5">
                   <button
                     type="button"
-                    onClick={() => setShowBotToken(!showBotToken)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                    title={showBotToken ? "Sembunyikan Token" : "Tampilkan Token"}
+                    onClick={() => setShowCustomToken(!showCustomToken)}
+                    className="text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    {showBotToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    <span>{showCustomToken ? "▼ Sembunyikan Pengaturan Kustom Token" : "► Pengaturan Lanjutan: Kustom Token Bot (Opsional)"}</span>
                   </button>
+
+                  {showCustomToken && (
+                    <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-slate-700">
+                          Token Bot Pribadi (Biarkan kosong untuk memakai @uboslogaritma_bot bawaan)
+                        </label>
+                      </div>
+                      <div className="relative">
+                        <Key className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                        <input
+                          type={showBotToken ? "text" : "password"}
+                          value={telegramBotToken}
+                          onChange={(e) => setTelegramBotToken(e.target.value)}
+                          placeholder="8643536180:AAGXpku7juz7AqqDNlWn1JKPIFkttPap5iA"
+                          className="w-full pl-9 pr-10 py-2 text-xs font-semibold border border-slate-200 rounded-xl font-mono bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowBotToken(!showBotToken)}
+                          className="absolute right-3 top-2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                          title={showBotToken ? "Sembunyikan Token" : "Tampilkan Token"}
+                        >
+                          {showBotToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Masukkan token dari <strong>@BotFather</strong> dan pastikan bot telah diundang ke grup Telegram toko {telegramChatId ? (<strong>({telegramChatId})</strong>) : ""} agar laporan terkirim 100% otomatis.
-                </p>
               </div>
 
               <div className="pt-3 flex flex-wrap items-center justify-between gap-3">
