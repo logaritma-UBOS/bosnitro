@@ -31,6 +31,46 @@ export function BranchProvider({ children, businessId }: { children: React.React
     }
   }, [businessId])
 
+  const readLocalBranches = useCallback((): Branch[] => {
+    if (typeof window === "undefined") return []
+    try {
+      // 1. Direct scoped key
+      const cached = localStorage.getItem(BRANCHES_STORAGE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+      // 2. Backup key
+      if (businessId) {
+        const backup = localStorage.getItem(`bosnitro_branches_list_${businessId}_backup`)
+        if (backup) {
+          const parsed = JSON.parse(backup)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        }
+      }
+      // 3. Scan other candidate keys for this user or business
+      let bestCandidate: Branch[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith("bosnitro_branches_list")) {
+          try {
+            const val = localStorage.getItem(key)
+            if (val) {
+              const parsed = JSON.parse(val)
+              if (Array.isArray(parsed) && parsed.length > bestCandidate.length) {
+                if (!businessId || parsed.some((b: any) => !b.businessId || b.businessId === businessId)) {
+                  bestCandidate = parsed
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+      if (bestCandidate.length > 0) return bestCandidate
+    } catch (e) {}
+    return []
+  }, [BRANCHES_STORAGE_KEY, businessId])
+
   const [branches, setBranches] = useState<Branch[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -39,6 +79,13 @@ export function BranchProvider({ children, businessId }: { children: React.React
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed) && parsed.length > 0) {
             return parsed
+          }
+        }
+        if (businessId) {
+          const backup = localStorage.getItem(`bosnitro_branches_list_${businessId}_backup`)
+          if (backup) {
+            const parsed = JSON.parse(backup)
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed
           }
         }
       } catch (e) {}
@@ -53,7 +100,7 @@ export function BranchProvider({ children, businessId }: { children: React.React
         if (saved && saved !== "ALL") return saved
       } catch (e) {}
     }
-    return branches[0]?.id || "branch-utama"
+    return branches[0]?.id || (businessId ? `${businessId}-utama` : "branch-utama")
   })
 
   const [isAllBranches, setIsAllBranches] = useState<boolean>(() => {
@@ -66,25 +113,19 @@ export function BranchProvider({ children, businessId }: { children: React.React
     return false
   })
 
-  const persistBranchesLocal = (list: Branch[]) => {
+  const persistBranchesLocal = useCallback((list: Branch[]) => {
     try {
       localStorage.setItem(BRANCHES_STORAGE_KEY, JSON.stringify(list))
+      if (businessId) {
+        localStorage.setItem(`bosnitro_branches_list_${businessId}_backup`, JSON.stringify(list))
+      }
       window.dispatchEvent(new CustomEvent(BRANCH_EVENT_NAME, { detail: list }))
     } catch (e) {}
-  }
+  }, [BRANCHES_STORAGE_KEY, BRANCH_EVENT_NAME, businessId])
 
   const refreshBranches = useCallback(async () => {
-    // 1. Read existing from local cache
-    let localBranches: Branch[] = []
-    try {
-      const cached = localStorage.getItem(BRANCHES_STORAGE_KEY)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          localBranches = parsed
-        }
-      }
-    } catch (e) {}
+    // 1. Read existing from local cache (NEVER lose existing local branches)
+    const localBranches = readLocalBranches()
 
     try {
       const res = await fetch("/api/branches")
@@ -93,24 +134,39 @@ export function BranchProvider({ children, businessId }: { children: React.React
         if (Array.isArray(serverData)) {
           // Merge server data and local branches
           const branchMap = new Map<string, Branch>()
-          for (const b of serverData) if (b && b.id) branchMap.set(b.id, b)
-          for (const b of localBranches) if (b && b.id && (!businessId || !b.businessId || b.businessId === businessId)) branchMap.set(b.id, b)
+
+          // 1. Add all local branches FIRST (preserves newly created branches across refreshes)
+          for (const b of localBranches) {
+            if (b && b.id) {
+              branchMap.set(b.id, { ...b, businessId: businessId || b.businessId })
+            }
+          }
+
+          // 2. Merge server data
+          for (const b of serverData) {
+            if (b && b.id) {
+              const existing = branchMap.get(b.id)
+              branchMap.set(b.id, { ...existing, ...b, businessId: businessId || b.businessId })
+            }
+          }
 
           if (branchMap.size === 0 && !businessId) {
             for (const b of DEFAULT_BRANCHES) branchMap.set(b.id, b)
           }
 
           const merged = Array.from(branchMap.values())
-          setBranches(merged)
-          persistBranchesLocal(merged)
+          if (merged.length > 0) {
+            setBranches(merged)
+            persistBranchesLocal(merged)
+          }
 
           // If local has branches that server doesn't have (cold container restart), auto-heal server
           const missingOnServer = localBranches.filter(lb => !serverData.some(sb => sb.id === lb.id))
-          if (missingOnServer.length > 0) {
+          if (missingOnServer.length > 0 || (merged.length > serverData.length)) {
             fetch("/api/branches", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ branches: merged }),
+              body: JSON.stringify({ branches: merged, businessId }),
             }).catch(() => {})
           }
         }
@@ -121,16 +177,16 @@ export function BranchProvider({ children, businessId }: { children: React.React
         setBranches(localBranches)
       }
     }
-  }, [BRANCHES_STORAGE_KEY, BRANCH_EVENT_NAME, businessId])
+  }, [readLocalBranches, persistBranchesLocal, businessId])
 
   useEffect(() => {
     refreshBranches()
 
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === BRANCHES_STORAGE_KEY && e.newValue) {
+      if ((e.key === BRANCHES_STORAGE_KEY || e.key === `bosnitro_branches_list_${businessId}_backup`) && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue)
-          if (Array.isArray(parsed)) setBranches(parsed)
+          if (Array.isArray(parsed) && parsed.length > 0) setBranches(parsed)
         } catch (err) {}
       }
       if (e.key === STORAGE_KEY && e.newValue) {
@@ -144,7 +200,7 @@ export function BranchProvider({ children, businessId }: { children: React.React
     }
 
     const handleCustomSync = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) {
+      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
         setBranches(e.detail)
       }
     }
@@ -155,7 +211,7 @@ export function BranchProvider({ children, businessId }: { children: React.React
       window.removeEventListener("storage", handleStorageChange)
       window.removeEventListener(BRANCH_EVENT_NAME, handleCustomSync)
     }
-  }, [refreshBranches])
+  }, [refreshBranches, BRANCHES_STORAGE_KEY, STORAGE_KEY, BRANCH_EVENT_NAME, businessId])
 
   useEffect(() => {
     try {
@@ -172,7 +228,7 @@ export function BranchProvider({ children, businessId }: { children: React.React
         setSelectedBranchIdState(branches[0].id)
       }
     } catch (e) {}
-  }, [branches, selectedBranchId])
+  }, [branches, selectedBranchId, STORAGE_KEY])
 
   const setSelectedBranchId = (id: string) => {
     if (id === "ALL") {
@@ -190,20 +246,37 @@ export function BranchProvider({ children, businessId }: { children: React.React
   }
 
   const addBranch = (newBranch: Branch) => {
+    const branchWithBiz: Branch = {
+      ...newBranch,
+      businessId: businessId || newBranch.businessId,
+    }
     setBranches(prev => {
       const map = new Map<string, Branch>()
-      for (const b of prev) map.set(b.id, b)
-      map.set(newBranch.id, newBranch)
+      for (const b of prev) if (b && b.id) map.set(b.id, b)
+      map.set(branchWithBiz.id, branchWithBiz)
       const updated = Array.from(map.values())
       persistBranchesLocal(updated)
       return updated
     })
-    setSelectedBranchId(newBranch.id)
+    setSelectedBranchId(branchWithBiz.id)
+
+    // Eagerly sync to server
+    fetch("/api/branches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: branchWithBiz.id,
+        name: branchWithBiz.name,
+        location: branchWithBiz.location,
+        deviceId: branchWithBiz.deviceId,
+        businessId,
+      }),
+    }).catch(() => {})
   }
 
   const updateBranchState = (updated: Branch) => {
     setBranches(prev => {
-      const next = prev.map(b => b.id === updated.id ? updated : b)
+      const next = prev.map(b => b.id === updated.id ? { ...b, ...updated } : b)
       persistBranchesLocal(next)
       return next
     })
@@ -220,7 +293,13 @@ export function BranchProvider({ children, businessId }: { children: React.React
     })
   }
 
-  const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0] || DEFAULT_BRANCHES[0]
+  const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0] || ({
+    id: businessId ? `${businessId}-utama` : "branch-utama",
+    businessId,
+    name: "Cabang Utama",
+    location: "Jl. Utama No. 1",
+    status: "ONLINE",
+  } as Branch)
 
   return (
     <BranchContext.Provider

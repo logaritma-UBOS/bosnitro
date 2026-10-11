@@ -13,7 +13,7 @@ interface EditBranchModalProps {
 }
 
 export default function EditBranchModal({ branch, isOpen, onClose, onSuccess }: EditBranchModalProps) {
-  const { updateBranchState } = useBranch()
+  const { updateBranchState, businessId } = useBranch()
   const [name, setName] = useState("")
   const [location, setLocation] = useState("")
   const [deviceId, setDeviceId] = useState("")
@@ -52,6 +52,7 @@ export default function EditBranchModal({ branch, isOpen, onClose, onSuccess }: 
           name: name.trim(),
           location: location.trim(),
           deviceId: deviceId.trim() || undefined,
+          businessId,
         }),
       })
 

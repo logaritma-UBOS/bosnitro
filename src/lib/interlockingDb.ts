@@ -5,6 +5,7 @@ import { upsertCustomer } from "@/lib/crmDb"
 
 // Dynamic runtime branches (starts with 1 initial branch from DEFAULT_BRANCHES, expandable)
 let runtimeBranches: Branch[] = [...DEFAULT_BRANCHES]
+const scopedRuntimeBranches: Record<string, Branch[]> = {}
 
 // Dynamic runtime store settings map (scoped by businessId/userId)
 const scopedRuntimeStoreSettings: Record<string, {
@@ -91,7 +92,6 @@ export async function getStoreSettings(scopeId?: string): Promise<{
 
 export async function getTenantBusinessId(session: any): Promise<string | undefined> {
   if (!session?.user?.id) return undefined
-  if (session.user.businessId) return session.user.businessId
   if (session.user.staffBusinessId) return session.user.staffBusinessId
   try {
     const { prisma } = await import("@/lib/prisma")
@@ -101,6 +101,7 @@ export async function getTenantBusinessId(session: any): Promise<string | undefi
     })
     if (biz?.id) return biz.id
   } catch (e) {}
+  if (session.user.businessId && session.user.businessId !== session.user.id) return session.user.businessId
   return session.user.id
 }
 
@@ -211,21 +212,64 @@ export async function updateStoreSettings(
   return item
 }
 
+export async function getTargetBranchKeys(businessId?: string): Promise<string[]> {
+  const keys: string[] = []
+  if (businessId) {
+    keys.push(`${businessId}_branches_list`)
+    try {
+      const { prisma } = await import("@/lib/prisma")
+      const biz = await prisma.business.findFirst({
+        where: { OR: [{ id: businessId }, { userId: businessId }] },
+        select: { id: true, userId: true }
+      })
+      if (biz) {
+        if (biz.id && !keys.includes(`${biz.id}_branches_list`)) keys.push(`${biz.id}_branches_list`)
+        if (biz.userId && !keys.includes(`${biz.userId}_branches_list`)) keys.push(`${biz.userId}_branches_list`)
+      }
+    } catch (e) {}
+  } else {
+    keys.push("bosnitro_branches_list")
+  }
+  return keys
+}
+
 export async function getBranches(businessId?: string): Promise<Branch[]> {
-  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  const keys = await getTargetBranchKeys(businessId)
+
+  // 1. Check in-memory scoped cache first
+  for (const k of keys) {
+    if (scopedRuntimeBranches[k] && scopedRuntimeBranches[k].length > 0) {
+      return scopedRuntimeBranches[k]
+    }
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma")
-    const setting = await prisma.systemSetting.findUnique({
-      where: { key: branchKey }
+    const settings = await prisma.systemSetting.findMany({
+      where: { key: { in: keys } }
     })
-    if (setting?.value) {
-      const parsed = JSON.parse(setting.value)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+
+    let longestBranches: Branch[] = []
+    for (const setting of settings) {
+      if (setting?.value) {
+        try {
+          const parsed = JSON.parse(setting.value)
+          if (Array.isArray(parsed) && parsed.length > longestBranches.length) {
+            longestBranches = parsed
+          }
+        } catch (e) {}
       }
     }
 
-    // Auto-generate initial branch for this business if none exists
+    if (longestBranches.length > 0) {
+      // Sync to scoped in-memory cache and backfill all target key aliases
+      for (const k of keys) {
+        scopedRuntimeBranches[k] = longestBranches
+      }
+      return longestBranches
+    }
+
+    // Auto-generate initial branch for this business if none exists anywhere
     if (businessId) {
       const defaultInitial: Branch[] = [
         {
@@ -238,11 +282,14 @@ export async function getBranches(businessId?: string): Promise<Branch[]> {
           createdAt: new Date().toISOString(),
         }
       ]
-      await prisma.systemSetting.upsert({
-        where: { key: branchKey },
-        update: { value: JSON.stringify(defaultInitial) },
-        create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(defaultInitial) }
-      }).catch(() => {})
+      for (const k of keys) {
+        scopedRuntimeBranches[k] = defaultInitial
+        await prisma.systemSetting.upsert({
+          where: { key: k },
+          update: { value: JSON.stringify(defaultInitial) },
+          create: { id: `sys-${k}`, key: k, value: JSON.stringify(defaultInitial) }
+        }).catch(() => {})
+      }
       return defaultInitial
     }
   } catch (e) {}
@@ -251,7 +298,7 @@ export async function getBranches(businessId?: string): Promise<Branch[]> {
 }
 
 export async function saveBranchesBatch(branches: Branch[], businessId?: string): Promise<Branch[]> {
-  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  const keys = await getTargetBranchKeys(businessId)
   if (!Array.isArray(branches) || branches.length === 0) return await getBranches(businessId)
 
   const existingBranches = await getBranches(businessId)
@@ -261,13 +308,19 @@ export async function saveBranchesBatch(branches: Branch[], businessId?: string)
 
   const merged = Array.from(map.values())
 
+  for (const k of keys) {
+    scopedRuntimeBranches[k] = merged
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma")
-    await prisma.systemSetting.upsert({
-      where: { key: branchKey },
-      update: { value: JSON.stringify(merged) },
-      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(merged) }
-    })
+    for (const k of keys) {
+      await prisma.systemSetting.upsert({
+        where: { key: k },
+        update: { value: JSON.stringify(merged) },
+        create: { id: `sys-${k}`, key: k, value: JSON.stringify(merged) }
+      }).catch(() => {})
+    }
   } catch (e) {}
 
   return merged
@@ -278,7 +331,7 @@ export async function createBranch(data: { id?: string; name: string; location: 
   const cleanLocation = data.location.trim()
   const slug = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-")
   const branchId = data.id || `branch-${slug}-${Date.now().toString().slice(-4)}`
-  const branchKey = data.businessId ? `${data.businessId}_branches_list` : "bosnitro_branches_list"
+  const keys = await getTargetBranchKeys(data.businessId)
 
   const branches = await getBranches(data.businessId)
   const existingIdx = branches.findIndex(b => b.id === branchId || b.name.toLowerCase() === cleanName.toLowerCase())
@@ -299,13 +352,19 @@ export async function createBranch(data: { id?: string; name: string; location: 
     branches.push(newBranch)
   }
 
+  for (const k of keys) {
+    scopedRuntimeBranches[k] = branches
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma")
-    await prisma.systemSetting.upsert({
-      where: { key: branchKey },
-      update: { value: JSON.stringify(branches) },
-      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(branches) }
-    })
+    for (const k of keys) {
+      await prisma.systemSetting.upsert({
+        where: { key: k },
+        update: { value: JSON.stringify(branches) },
+        create: { id: `sys-${k}`, key: k, value: JSON.stringify(branches) }
+      }).catch(() => {})
+    }
   } catch (e) {}
 
   try {
@@ -326,7 +385,7 @@ export async function updateBranch(
   data: { name?: string; location?: string; deviceId?: string },
   businessId?: string
 ): Promise<Branch | null> {
-  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  const keys = await getTargetBranchKeys(businessId)
   const branches = await getBranches(businessId)
   const branchIndex = branches.findIndex(b => b.id === id)
   if (branchIndex === -1) return null
@@ -338,13 +397,19 @@ export async function updateBranch(
 
   branches[branchIndex] = branch
 
+  for (const k of keys) {
+    scopedRuntimeBranches[k] = branches
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma")
-    await prisma.systemSetting.upsert({
-      where: { key: branchKey },
-      update: { value: JSON.stringify(branches) },
-      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(branches) }
-    })
+    for (const k of keys) {
+      await prisma.systemSetting.upsert({
+        where: { key: k },
+        update: { value: JSON.stringify(branches) },
+        create: { id: `sys-${k}`, key: k, value: JSON.stringify(branches) }
+      }).catch(() => {})
+    }
   } catch (e) {}
 
   try {
@@ -359,19 +424,25 @@ export async function updateBranch(
 }
 
 export async function deleteBranch(id: string, businessId?: string): Promise<boolean> {
-  const branchKey = businessId ? `${businessId}_branches_list` : "bosnitro_branches_list"
+  const keys = await getTargetBranchKeys(businessId)
   const branches = await getBranches(businessId)
   if (branches.length <= 1) return false
 
   const nextBranches = branches.filter(b => b.id !== id)
 
+  for (const k of keys) {
+    scopedRuntimeBranches[k] = nextBranches
+  }
+
   try {
     const { prisma } = await import("@/lib/prisma")
-    await prisma.systemSetting.upsert({
-      where: { key: branchKey },
-      update: { value: JSON.stringify(nextBranches) },
-      create: { id: `sys-${branchKey}`, key: branchKey, value: JSON.stringify(nextBranches) }
-    })
+    for (const k of keys) {
+      await prisma.systemSetting.upsert({
+        where: { key: k },
+        update: { value: JSON.stringify(nextBranches) },
+        create: { id: `sys-${k}`, key: k, value: JSON.stringify(nextBranches) }
+      }).catch(() => {})
+    }
   } catch (e) {}
 
   try {

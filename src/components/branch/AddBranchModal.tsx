@@ -12,7 +12,7 @@ interface AddBranchModalProps {
 }
 
 export default function AddBranchModal({ isOpen, onClose, onSuccess }: AddBranchModalProps) {
-  const { addBranch } = useBranch()
+  const { addBranch, businessId } = useBranch()
   const [name, setName] = useState("")
   const [location, setLocation] = useState("")
   const [deviceId, setDeviceId] = useState("")
@@ -40,6 +40,7 @@ export default function AddBranchModal({ isOpen, onClose, onSuccess }: AddBranch
           name: name.trim(),
           location: location.trim() || "Outlet",
           deviceId: deviceId.trim() || undefined,
+          businessId,
         }),
       })
 

@@ -144,6 +144,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Simpan hari login untuk fitur "Wajib login tiap hari" (Reset tengah malam)
         token.loginDateStr = currentDayStr;
       }
+
+      // Guarantee businessId is always canonically resolved even if session was established previously
+      if (token.id && (!token.businessId || token.businessId === token.id)) {
+        try {
+          const dbUser = await prisma.user.findUnique({ 
+            where: { id: token.id as string },
+            include: { businesses: { select: { id: true }, take: 1 } }
+          })
+          if (dbUser) {
+            token.role = dbUser.role
+            token.staffBusinessId = dbUser.staffBusinessId
+            token.businessId = dbUser.staffBusinessId || dbUser.businesses[0]?.id || dbUser.id
+          }
+        } catch (e) {}
+      }
       
       if (!token.loginDateStr || token.loginDateStr !== currentDayStr) {
          return {} as any; // Return empty token

@@ -266,7 +266,8 @@ export default function OwnerDashboardInterlockingClient({
       return
     }
     try {
-      const res = await fetch(`/api/branches?id=${encodeURIComponent(branchId)}`, {
+      const bizParam = businessId ? `&businessId=${encodeURIComponent(businessId)}` : ""
+      const res = await fetch(`/api/branches?id=${encodeURIComponent(branchId)}${bizParam}`, {
         method: "DELETE",
       })
       const data = await res.json()

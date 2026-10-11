@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getBranches, createBranch, updateBranch, deleteBranch, saveBranchesBatch, getTenantBusinessId } from "@/lib/interlockingDb"
 import { auth } from "@/auth"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth()
-    const businessId = await getTenantBusinessId(session)
+    const sessionBizId = await getTenantBusinessId(session)
+    const { searchParams } = new URL(req.url)
+    const businessId = sessionBizId || searchParams.get("businessId") || undefined
     const branches = await getBranches(businessId)
     return NextResponse.json(branches)
   } catch (error: any) {
@@ -20,8 +22,9 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Hanya Owner yang dapat mengubah data cabang" }, { status: 403 })
     }
 
-    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
+    const sessionBizId = await getTenantBusinessId(session)
+    const businessId = sessionBizId || body.businessId
     const { id, name, location, deviceId } = body
 
     if (!id) {
@@ -59,8 +62,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const businessId = await getTenantBusinessId(session)
     const body = await req.json()
+    const sessionBizId = await getTenantBusinessId(session)
+    const businessId = sessionBizId || body.businessId
 
     // Support batch branches auto-heal / sync
     if (Array.isArray(body.branches)) {
@@ -96,9 +100,10 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Hanya Owner yang dapat menghapus cabang" }, { status: 403 })
     }
 
-    const businessId = await getTenantBusinessId(session)
+    const sessionBizId = await getTenantBusinessId(session)
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
+    const businessId = sessionBizId || searchParams.get("businessId") || undefined
 
     if (!id) {
       return NextResponse.json({ error: "ID Cabang wajib disertakan" }, { status: 400 })
