@@ -8,7 +8,7 @@ import BranchSelector from "@/components/branch/BranchSelector"
 import AddBranchModal from "@/components/branch/AddBranchModal"
 import EditBranchModal from "@/components/branch/EditBranchModal"
 import Link from "next/link"
-import { getLocalTransactions, syncTransactions, subscribeTransactions } from "@/lib/transactionStore"
+import { getLocalTransactions, syncTransactions, subscribeTransactions, saveLocalTransactions } from "@/lib/transactionStore"
 import {
   BarChart3,
   TrendingUp,
@@ -112,6 +112,9 @@ export default function OwnerDashboardInterlockingClient({
   }
 
   useEffect(() => {
+    if (initialTransactions && initialTransactions.length > 0) {
+      saveLocalTransactions(initialTransactions, businessId)
+    }
     refreshDashboardTransactions()
 
     const botKey = businessId ? `bosnitro_telegram_bot_token_${businessId}` : "bosnitro_telegram_bot_token"

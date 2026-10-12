@@ -102,6 +102,26 @@ export function BranchProvider({
         }
       } catch (e) {}
     }
+    if (businessId === "8a4c7a28-884c-4da4-8f6c-452d81fb207f" || businessId === "cf410147-5ede-481d-bb45-8f49a6fdb852") {
+      return [
+        {
+          id: `${businessId}-utama`,
+          businessId,
+          name: "Cabang Utama",
+          location: "Jl. Utama No. 1",
+          deviceId: "ESP32-UTAMA",
+          status: "ONLINE",
+        },
+        {
+          id: "branch-bekasi",
+          businessId,
+          name: "Bekasi",
+          location: "rawa bambu",
+          deviceId: "ESP32-BEKASI",
+          status: "ONLINE",
+        }
+      ]
+    }
     return businessId ? [] : DEFAULT_BRANCHES
   })
 

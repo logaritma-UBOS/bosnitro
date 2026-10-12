@@ -282,6 +282,17 @@ export async function getBranches(businessId?: string): Promise<Branch[]> {
           createdAt: new Date().toISOString(),
         }
       ]
+      if (businessId === "8a4c7a28-884c-4da4-8f6c-452d81fb207f" || businessId === "cf410147-5ede-481d-bb45-8f49a6fdb852") {
+        defaultInitial.push({
+          id: "branch-bekasi",
+          businessId,
+          name: "Bekasi",
+          location: "rawa bambu",
+          deviceId: "ESP32-BEKASI",
+          status: "ONLINE",
+          createdAt: new Date().toISOString(),
+        })
+      }
       for (const k of keys) {
         scopedRuntimeBranches[k] = defaultInitial
         await prisma.systemSetting.upsert({
@@ -1063,7 +1074,16 @@ export async function getTransactions(branchId?: string, businessId?: string): P
     if (!branchId || branchId === "ALL") {
       return all
     }
-    return all.filter(t => t.branchId === branchId)
+    return all.filter(t => {
+      if (t.branchId === branchId) return true
+      if ((branchId === "branch-utama" || branchId.endsWith("-utama")) && (t.branchId === "branch-utama" || t.branchId.endsWith("-utama") || t.branchName?.toLowerCase().includes("utama"))) {
+        return true
+      }
+      if ((branchId === "branch-bekasi" || branchId.includes("bekasi")) && (t.branchId === "branch-bekasi" || t.branchId.includes("bekasi") || t.branchName?.toLowerCase().includes("bekasi"))) {
+        return true
+      }
+      return false
+    })
   } catch (e) {
     let all = runtimeTransactions
     if (businessId) {
@@ -1072,7 +1092,16 @@ export async function getTransactions(branchId?: string, businessId?: string): P
     if (!branchId || branchId === "ALL") {
       return all
     }
-    return all.filter(t => t.branchId === branchId)
+    return all.filter(t => {
+      if (t.branchId === branchId) return true
+      if ((branchId === "branch-utama" || branchId.endsWith("-utama")) && (t.branchId === "branch-utama" || t.branchId.endsWith("-utama") || t.branchName?.toLowerCase().includes("utama"))) {
+        return true
+      }
+      if ((branchId === "branch-bekasi" || branchId.includes("bekasi")) && (t.branchId === "branch-bekasi" || t.branchId.includes("bekasi") || t.branchName?.toLowerCase().includes("bekasi"))) {
+        return true
+      }
+      return false
+    })
   }
 }
 

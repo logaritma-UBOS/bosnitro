@@ -37,7 +37,9 @@ export async function GET(req: Request) {
     const filteredTrx = allTrx.filter((t: InterlockingTransaction) => {
       const trxDate = new Date(t.createdAt)
       const isWithin30Days = trxDate >= thirtyDaysAgo && trxDate <= now
-      const matchesBranch = !branchId || branchId === "ALL" || t.branchId === branchId
+      const matchesBranch = !branchId || branchId === "ALL" || t.branchId === branchId ||
+        ((branchId === "branch-utama" || branchId.endsWith("-utama")) && (t.branchId === "branch-utama" || t.branchId.endsWith("-utama") || t.branchName?.toLowerCase().includes("utama"))) ||
+        ((branchId === "branch-bekasi" || branchId.includes("bekasi")) && (t.branchId === "branch-bekasi" || t.branchId.includes("bekasi") || t.branchName?.toLowerCase().includes("bekasi")))
       return isWithin30Days && matchesBranch
     })
 
