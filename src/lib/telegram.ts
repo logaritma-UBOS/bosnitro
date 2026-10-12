@@ -214,9 +214,17 @@ export async function generateDailyBranchReportText(
     // ===== DASHBOARD OWNER: KONSOLIDASI MULTI-CABANG =====
     const branchPerformanceLines = branches
       .map((b) => {
-        const bTxs = allTx.filter((t) => t.branchId === b.id)
+        const bTxs = allTx.filter((t) => 
+          t.branchId === b.id ||
+          t.branchName?.toLowerCase() === b.name.toLowerCase() ||
+          (b.id.includes("utama") && (t.branchId.includes("utama") || t.branchName?.toLowerCase().includes("utama")))
+        )
         const bRev = bTxs.reduce((sum, t) => sum + t.totalAmount, 0)
-        const bClosings = allClosings.filter((c) => c.branchId === b.id)
+        const bClosings = allClosings.filter((c) => 
+          c.branchId === b.id ||
+          c.branchName?.toLowerCase() === b.name.toLowerCase() ||
+          (b.id.includes("utama") && (c.branchId.includes("utama") || c.branchName?.toLowerCase().includes("utama")))
+        )
 
         let bMotor = 0
         let bMobil = 0

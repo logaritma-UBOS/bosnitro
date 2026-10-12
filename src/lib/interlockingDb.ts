@@ -1152,14 +1152,26 @@ export async function recordFraudAlert(payload: {
   deviceId: string
   alertType: FraudAlert["alertType"]
   message: string
+  skipTelegramNotify?: boolean
 }): Promise<FraudAlert> {
   const allBranches = await getBranches(payload.businessId)
-  const branch = allBranches.find(b => b.id === payload.branchId) || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  let branch = allBranches.find(b => b.id === payload.branchId)
+  if (!branch) {
+    branch = allBranches.find(b => 
+      b.name.toLowerCase() === payload.branchId.toLowerCase() ||
+      (payload.branchId.includes("utama") && (b.id.includes("utama") || b.name.toLowerCase().includes("utama"))) ||
+      (payload.branchId.includes("bekasi") && (b.id.includes("bekasi") || b.name.toLowerCase().includes("bekasi"))) ||
+      (payload.branchId.includes("cikanteh") && (b.id.includes("cikanteh") || b.name.toLowerCase().includes("cikanteh")))
+    )
+  }
+  if (!branch) {
+    branch = allBranches[0] || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Utama", location: "" }
+  }
 
   const alert: FraudAlert = {
     id: `ALERT-${Date.now()}`,
     businessId: payload.businessId,
-    branchId: payload.branchId,
+    branchId: branch.id,
     branchName: branch.name,
     deviceId: payload.deviceId,
     alertType: payload.alertType,
@@ -1178,27 +1190,29 @@ export async function recordFraudAlert(payload: {
     })
   } catch (e) {}
 
-  // Send Telegram Notification customized by alert type
-  let headerTitle = "🚨 <b>PERINGATAN SENSOR IOT - KECURANGAN / ANOMALI</b>"
-  let footerNote = "<i>Mohon segera periksa CCTV atau galeri audit POS cabang terkait!</i>"
+  if (!payload.skipTelegramNotify) {
+    // Send Telegram Notification customized by alert type
+    let headerTitle = "🚨 <b>PERINGATAN SENSOR IOT - KECURANGAN / ANOMALI</b>"
+    let footerNote = "<i>Mohon segera periksa CCTV atau galeri audit POS cabang terkait!</i>"
 
-  if (payload.alertType === "SENSOR_OFFLINE" || payload.alertType === "DEVICE_OFFLINE") {
-    headerTitle = "🚨 <b>PERINGATAN PERANGKAT IOT - SENSOR / MODUL MATI (OFFLINE)</b>"
-    footerNote = "<i>Periksa koneksi daya atau jaringan WiFi modul ESP32 di outlet terkait!</i>"
-  } else if (payload.alertType === "DISCREPANCY") {
-    headerTitle = "⚠️ <b>PERINGATAN AUDIT KASIR - SELISIH SETORAN UANG</b>"
-    footerNote = "<i>Pemeriksaan selisih setoran fisik kasir otomatis oleh BOSNITRO Audit System.</i>"
+    if (payload.alertType === "SENSOR_OFFLINE" || payload.alertType === "DEVICE_OFFLINE") {
+      headerTitle = "🚨 <b>PERINGATAN PERANGKAT IOT - SENSOR / MODUL MATI (OFFLINE)</b>"
+      footerNote = "<i>Periksa koneksi daya atau jaringan WiFi modul ESP32 di outlet terkait!</i>"
+    } else if (payload.alertType === "DISCREPANCY") {
+      headerTitle = "⚠️ <b>PERINGATAN AUDIT KASIR - SELISIH SETORAN UANG</b>"
+      footerNote = "<i>Pemeriksaan selisih setoran fisik kasir otomatis oleh BOSNITRO Audit System.</i>"
+    }
+
+    const tgMsg = `${headerTitle}\n\n` +
+      `📍 <b>Cabang:</b> ${branch.name} (${branch.location || "-"})\n` +
+      `📟 <b>Device ID:</b> ${payload.deviceId}\n` +
+      `⚠️ <b>Tipe:</b> ${payload.alertType}\n` +
+      `📝 <b>Detail:</b> ${payload.message}\n` +
+      `⏰ <b>Waktu:</b> ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
+      `${footerNote}`
+
+    await sendTelegramAlert(tgMsg, payload.businessId)
   }
-
-  const tgMsg = `${headerTitle}\n\n` +
-    `📍 <b>Cabang:</b> ${branch.name} (${branch.location})\n` +
-    `📟 <b>Device ID:</b> ${payload.deviceId}\n` +
-    `⚠️ <b>Tipe:</b> ${payload.alertType}\n` +
-    `📝 <b>Detail:</b> ${payload.message}\n` +
-    `⏰ <b>Waktu:</b> ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n` +
-    `${footerNote}`
-
-  await sendTelegramAlert(tgMsg, payload.businessId)
 
   return alert
 }
@@ -1212,20 +1226,47 @@ export async function recordShiftClosing(payload: {
   notes?: string
 }): Promise<ShiftClosing> {
   const allBranches = await getBranches(payload.businessId)
-  const branch = allBranches.find(b => b.id === payload.branchId) || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Outlet", location: "" }
+  let branch = allBranches.find(b => b.id === payload.branchId)
+  if (!branch) {
+    branch = allBranches.find(b => 
+      b.name.toLowerCase() === payload.branchId.toLowerCase() ||
+      (payload.branchId.includes("utama") && (b.id.includes("utama") || b.name.toLowerCase().includes("utama"))) ||
+      (payload.branchId.includes("bekasi") && (b.id.includes("bekasi") || b.name.toLowerCase().includes("bekasi"))) ||
+      (payload.branchId.includes("cikanteh") && (b.id.includes("cikanteh") || b.name.toLowerCase().includes("cikanteh")))
+    )
+  }
+  if (!branch) {
+    branch = allBranches[0] || runtimeBranches.find(b => b.id === payload.branchId) || DEFAULT_BRANCHES.find(b => b.id === payload.branchId) || { id: payload.branchId, name: "Cabang Utama", location: "" }
+  }
 
-  const branchTxs = (await getTransactions(payload.branchId, payload.businessId)).filter(t => 
-    t.branchId === payload.branchId &&
-    t.paymentMethod === "CASH" &&
-    t.status === "COMPLETED"
-  )
-  const systemRevenue = branchTxs.reduce((sum, t) => sum + t.totalAmount, 0)
+  const effectiveBranchId = branch.id
+
+  // Get all completed cash transactions for this branch
+  const allBranchTxs = await getTransactions(effectiveBranchId, payload.businessId)
+  const cashTxs = allBranchTxs.filter(t => t.paymentMethod === "CASH" && t.status === "COMPLETED")
+
+  // Check previous shift closings for this branch to isolate this shift's transactions
+  const previousClosings = (await getShiftClosings(effectiveBranchId, payload.businessId))
+  const lastClosingTime = previousClosings.length > 0 ? new Date(previousClosings[0].closedAt).getTime() : 0
+
+  // Calculate current shift transactions (if any created after last closing)
+  const currentShiftTxs = lastClosingTime > 0
+    ? cashTxs.filter(t => new Date(t.createdAt).getTime() > lastClosingTime)
+    : cashTxs
+
+  // Fallback to today's cash transactions if currentShiftTxs is empty (or on same-day testing)
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayCashTxs = cashTxs.filter(t => new Date(t.createdAt).getTime() >= todayStart.getTime())
+
+  const effectiveTxs = currentShiftTxs.length > 0 ? currentShiftTxs : (todayCashTxs.length > 0 ? todayCashTxs : cashTxs)
+  const systemRevenue = effectiveTxs.reduce((sum, t) => sum + t.totalAmount, 0)
   const discrepancy = payload.physicalCash - systemRevenue
 
   const closing: ShiftClosing = {
     id: `SHIFT-${Date.now()}`,
     businessId: payload.businessId,
-    branchId: payload.branchId,
+    branchId: effectiveBranchId,
     branchName: branch.name,
     cashierId: payload.cashierId,
     cashierName: payload.cashierName,
@@ -1322,33 +1363,46 @@ let runtimeStaffs: BranchStaff[] = [
   },
 ]
 
-export async function getUserAssignedBranch(userId?: string, userEmail?: string): Promise<Branch | null> {
-  const branches = await getBranches()
+export async function getUserAssignedBranch(userId?: string, userEmail?: string, businessId?: string): Promise<Branch | null> {
+  const branches = await getBranches(businessId)
   
-  // 1. Check if user is staff in Prisma
-  try {
-    if (userId) {
-      const dbUser = await (await import("@/lib/prisma")).prisma.user.findUnique({
+  // 1. Check if user is OWNER in Prisma
+  if (userId) {
+    try {
+      const { prisma } = await import("@/lib/prisma")
+      const dbUser = await prisma.user.findUnique({
         where: { id: userId },
         select: { phone: true, role: true }
       })
-      if (dbUser && dbUser.phone) {
-        const found = branches.find(b => b.id === dbUser.phone)
+      if (dbUser?.role === "OWNER") {
+        return null // Owner is not locked to a single branch; uses active selected branch
+      }
+      const userPhone = dbUser?.phone
+      if (userPhone) {
+        const found = branches.find(b => b.id === userPhone || b.name.toLowerCase() === userPhone.toLowerCase())
         if (found) return found
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
-  // 2. Check in runtimeStaffs
-  if (userEmail) {
-    const staff = runtimeStaffs.find(s => s.email.toLowerCase() === userEmail.toLowerCase())
-    if (staff) {
-      const found = branches.find(b => b.id === staff.branchId)
+  // 2. Check in staff list (persisted in DB or runtime)
+  const staffList = await getStaffListByBranch(undefined, businessId)
+  if (userEmail || userId) {
+    const staff = staffList.find(s => 
+      (userId && s.id === userId) ||
+      (userEmail && s.email.toLowerCase() === userEmail.toLowerCase())
+    )
+    if (staff && staff.branchId) {
+      const found = branches.find(b => 
+        b.id === staff.branchId || 
+        b.name.toLowerCase() === staff.branchName?.toLowerCase() ||
+        (staff.branchId.includes("utama") && b.id.includes("utama"))
+      )
       if (found) return found
     }
   }
 
-  // Fallback to first branch
+  // Fallback to first branch of this business
   return branches[0] || null
 }
 
@@ -1367,6 +1421,22 @@ export async function getStaffListByBranch(branchId?: string, businessId?: strin
           map.set(parsed.id, parsed)
         }
       } catch (e) {}
+    }
+    // Also check scoped staff list key if present
+    if (businessId) {
+      const scoped = await prisma.systemSetting.findUnique({
+        where: { key: `${businessId}_staff_list` }
+      })
+      if (scoped?.value) {
+        try {
+          const parsed = JSON.parse(scoped.value)
+          if (Array.isArray(parsed)) {
+            for (const s of parsed) {
+              if (s && s.id && !map.has(s.id)) map.set(s.id, s)
+            }
+          }
+        } catch (e) {}
+      }
     }
     for (const s of runtimeStaffs) {
       if (businessId && s.businessId && s.businessId !== businessId) continue

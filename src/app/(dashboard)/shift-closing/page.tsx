@@ -10,7 +10,7 @@ export default async function ShiftClosingPage() {
   const businessId = await getTenantBusinessId(session)
   const [closings, assignedBranch] = await Promise.all([
     getShiftClosings("ALL", businessId),
-    getUserAssignedBranch(session.user.id, session.user.email || undefined),
+    getUserAssignedBranch(session.user.id, session.user.email || undefined, businessId),
   ])
 
   return (

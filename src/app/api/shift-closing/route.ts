@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     })
 
     // 1. Auto-trigger Telegram report for this branch
-    sendDailyBranchReportTelegram(branchId, undefined, undefined, undefined, businessId).catch(console.error)
+    sendDailyBranchReportTelegram(closing.branchId, undefined, undefined, undefined, businessId).catch(console.error)
 
     // 2. Auto-trigger Telegram fraud/discrepancy alert if physical cash doesn't match POS system
     if (closing.discrepancy !== 0) {
@@ -50,10 +50,11 @@ export async function POST(req: NextRequest) {
       // Automatically register in Fraud Alert list for executive monitoring
       recordFraudAlert({
         businessId,
-        branchId,
+        branchId: closing.branchId,
         deviceId: `POS-${closing.cashierId || "CASHIER"}`,
         alertType: "DISCREPANCY",
-        message: `Selisih setoran kasir ${closing.cashierName} sebesar ${isDefisit ? "-" : "+"}${diffFormatted}. Fisik: ${formatRupiah(closing.physicalCash)}, Sistem: ${formatRupiah(closing.systemRevenue)}${closing.notes ? ` (Ket: ${closing.notes})` : ""}`
+        message: `Selisih setoran kasir ${closing.cashierName} sebesar ${isDefisit ? "-" : "+"}${diffFormatted}. Fisik: ${formatRupiah(closing.physicalCash)}, Sistem: ${formatRupiah(closing.systemRevenue)}${closing.notes ? ` (Ket: ${closing.notes})` : ""}`,
+        skipTelegramNotify: true,
       }).catch(console.error)
     }
 

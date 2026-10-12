@@ -26,9 +26,11 @@ export default function ShiftClosingClient({
   assignedBranch?: Branch | null
   user?: { id?: string; name?: string | null; role?: string | null }
 }) {
-  const { selectedBranch } = useBranch()
-  const activeBranch = assignedBranch || selectedBranch
+  const { selectedBranch, branches } = useBranch()
   const isOwnerOrManager = user?.role === "OWNER" || user?.role === "MANAGER"
+  const activeBranch = (!isOwnerOrManager && assignedBranch)
+    ? assignedBranch
+    : (selectedBranch || assignedBranch || branches[0] || { id: "branch-utama", name: "Cabang Utama", location: "" })
 
   const [activeTab, setActiveTab] = useState<"INPUT" | "HISTORY">("INPUT")
   const [closings, setClosings] = useState<ShiftClosing[]>(initialClosings)
@@ -120,10 +122,10 @@ export default function ShiftClosingClient({
           </div>
           <div>
             <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-wider block">
-              Cabang Anda
+              {isOwnerOrManager ? "Cabang Terpilih" : "Cabang Anda"}
             </span>
             <span className="text-xs font-bold text-slate-900 block">{activeBranch.name}</span>
-            <p className="text-[10px] text-slate-400 truncate max-w-[180px]">{activeBranch.location}</p>
+            <p className="text-[10px] text-slate-400 truncate max-w-[180px]">{activeBranch.location || "-"}</p>
           </div>
         </div>
       </div>
