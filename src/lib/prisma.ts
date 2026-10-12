@@ -4,11 +4,14 @@ import { PrismaLibSql } from '@prisma/adapter-libsql'
 import fs from 'fs'
 import path from 'path'
 
-function getDatabaseConfig() {
-  const rawUrl = process.env.DATABASE_URL
-  const rawToken = process.env.TURSO_AUTH_TOKEN
+const DEFAULT_TURSO_URL = 'libsql://bosnitro-logaritma.aws-ap-southeast-2.turso.io'
+const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTE3Nzc1NjksImlkIjoiMDFhMTJlNDItYjkwMS03NzYwLWIzMWItYjIzNzNmM2Q1MTNhIiwia2lkIjoib2I5ZkprdzFaa05ORXAyanFvcW9DQVR1QUR5ZmdwSk80UmRTdEhFY0VWWSIsInJpZCI6IjZmNTZiMjVhLTJhOTQtNDg5Mi1hZjQwLTJlMzU0ZDNmMjRhOSJ9.9w23ErAm-zW133YHWfdFIPQgR606QBrAQMsHKKpSTsG_BEFdf44CPiumZMLU_x9vDDjXeNF6ML__R0_BpeGzDg'
 
-  if (rawUrl && rawUrl.startsWith('libsql:')) {
+function getDatabaseConfig() {
+  const rawUrl = process.env.DATABASE_URL || DEFAULT_TURSO_URL
+  const rawToken = process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_TOKEN
+
+  if (rawUrl && (rawUrl.startsWith('libsql:') || rawUrl.startsWith('https:'))) {
     return { url: rawUrl, authToken: rawToken }
   }
 
